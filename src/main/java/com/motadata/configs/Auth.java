@@ -7,18 +7,27 @@ import io.vertx.ext.auth.PubSecKeyOptions;
 
 public class Auth {
 
-    private final JWTAuth jwtAuth;
+    private static JWTAuth jwtAuth;
 
-    public Auth(Vertx vertx) {
-        JWTAuthOptions options = new JWTAuthOptions()
-                .addPubSecKey(new PubSecKeyOptions()
-                        .setAlgorithm("HS256")
-                        .setBuffer("your_secret_key")); // Set your secret key
+    // Static block to initialize JWTAuth when it's needed
+    public static void initialize(Vertx vertx) {
+        if (jwtAuth == null) {
+            synchronized (Auth.class) {
+                if (jwtAuth == null) {
+                    JWTAuthOptions options = new JWTAuthOptions()
+                            .addPubSecKey(new PubSecKeyOptions()
+                                    .setAlgorithm("HS256")
+                                    .setBuffer("your_secret_key")); // Set your secret key
 
-        this.jwtAuth = JWTAuth.create(vertx, options);
+                    jwtAuth = JWTAuth.create(vertx, options);
+                }
+            }
+        }
     }
 
-    public JWTAuth getJwtAuth() {
+    // Getter to return the jwtAuth instance
+    public static JWTAuth getJwtAuth()
+    {
         return jwtAuth;
     }
 }

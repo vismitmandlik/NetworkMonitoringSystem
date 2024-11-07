@@ -2,45 +2,56 @@ package com.motadata.api;
 
 import com.motadata.db.Initializer;
 import com.motadata.configs.Auth;
-import io.vertx.core.Vertx;
+import io.vertx.core.AbstractVerticle;
 import io.vertx.core.http.HttpServer;
-import io.vertx.ext.auth.jwt.JWTAuth;
 import io.vertx.ext.mongo.MongoClient;
+import io.vertx.ext.auth.jwt.JWTAuth;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
 
-public class Server {
+public class Server extends AbstractVerticle {
 
-    private final Vertx vertx;
-    private final JWTAuth jwtAuth;
-    private final Router router;
+    private Router router;
 
-    public Server(Vertx vertx) {
-        this.vertx = vertx;
-        // Initialize MongoClient and JWTAuth using the configuration classes
-        MongoClient mongoClient = new Initializer(vertx).getMongoClient();
-        this.jwtAuth = new Auth(vertx).getJwtAuth();
+    @Override
+    public void start()
+    {
+        // Get MongoClient and JWTAuth instances using the static methods
+        MongoClient mongoClient = Initializer.getMongoClient();
+
+        Auth.initialize(vertx);
+
+        JWTAuth jwtAuth = Auth.getJwtAuth();
 
         // Initialize the router
-        this.router = Router.router(vertx);
-    }
+        router = Router.router(vertx);
 
-    public void startServer() {
-        // Setup routes using the User class
-        User userApi = new User(new com.motadata.services.User(), jwtAuth);
-        userApi.initRoutes(router);
-
-        // Adding BodyHandler for parsing incoming requests
-        router.route().handler(BodyHandler.create());
+        setupRoutes(mongoClient, jwtAuth);
 
         // Create and start the HTTP server
         HttpServer server = vertx.createHttpServer();
-        server.requestHandler(router).listen(8080, res -> {
-            if (res.succeeded()) {
+
+        server.requestHandler(router).listen(8080, res ->
+        {
+            if (res.succeeded())
+            {
                 System.out.println("Server started on port 8080");
-            } else {
+            }
+            else
+            {
                 System.err.println("Failed to start server: " + res.cause());
             }
         });
+    }
+
+    private void setupRoutes(MongoClient mongoClient, JWTAuth jwtAuth)
+    {
+
+        // Set up your API routes for user
+        User userApi = new User();
+
+        userApi.initRoutes(router);
+
+        // Additional routes can be added here as needed
     }
 }
