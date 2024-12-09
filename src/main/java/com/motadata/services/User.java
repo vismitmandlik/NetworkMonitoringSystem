@@ -65,7 +65,7 @@ public class User
             {
                 if (user.getString("password").equals(password))
                 {
-                    JWTOptions jwtOptions = new JWTOptions().setExpiresInSeconds(60 * 60);
+                    JWTOptions jwtOptions = new JWTOptions().setExpiresInSeconds(3600);
 
                     String token = jwtAuth.generateToken(new JsonObject().put("username", username), jwtOptions);
 

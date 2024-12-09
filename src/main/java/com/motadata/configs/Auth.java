@@ -10,17 +10,18 @@ public class Auth {
     private static JWTAuth jwtAuth;
 
     // Static block to initialize JWTAuth when it's needed
-    public static void initialize(Vertx vertx) {
-        if (jwtAuth == null) {
-            synchronized (Auth.class) {
-                if (jwtAuth == null) {
-                    JWTAuthOptions options = new JWTAuthOptions()
-                            .addPubSecKey(new PubSecKeyOptions()
-                                    .setAlgorithm("HS256")
-                                    .setBuffer("your_secret_key")); // Set your secret key
+    public static void initialize(Vertx vertx)
+    {
+        if (jwtAuth == null)
+        {
+            synchronized (Auth.class)
+            {
+                JWTAuthOptions options = new JWTAuthOptions()
+                        .addPubSecKey(new PubSecKeyOptions()
+                                .setAlgorithm("HS256")
+                                .setBuffer("your_secret_key")); // Set your secret key
 
-                    jwtAuth = JWTAuth.create(vertx, options);
-                }
+                jwtAuth = JWTAuth.create(vertx, options);
             }
         }
     }
