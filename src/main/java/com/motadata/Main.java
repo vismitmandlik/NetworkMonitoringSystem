@@ -6,7 +6,7 @@ import io.vertx.core.Vertx;
 import com.motadata.api.Server;
 import com.motadata.db.Initializer;
 
-public class Main extends AbstractVerticle
+public class Main
 {
     public static void main(String[] args)
     {
@@ -16,9 +16,9 @@ public class Main extends AbstractVerticle
 
         initializer.initMongoClient();
 
-        DeploymentOptions optionsForMyVerticle = new DeploymentOptions();
+        DeploymentOptions options = new DeploymentOptions();
 
-        vertx.deployVerticle(Server.class.getName(), optionsForMyVerticle, res ->
+        vertx.deployVerticle(Server.class.getName(), options, res ->
         {
             if (res.succeeded())
             {

@@ -13,6 +13,7 @@ public class User
 
     static JWTAuth jwtAuth = Auth.getJwtAuth();
 
+
     // Register a new user
     public static void register(RoutingContext context)
     {
@@ -36,9 +37,7 @@ public class User
                 JsonObject newUser = new JsonObject().put("username", username).put("password", password);
 
                 // Insert new user
-                Operations.insert(USERS_COLLECTION, newUser).onSuccess(id -> {
-                    context.response().setStatusCode(201).end("User registered successfully.");
-                }).onFailure(err -> {
+                Operations.insert(USERS_COLLECTION, newUser).onSuccess(id -> context.response().setStatusCode(201).end("User registered successfully.")).onFailure(err -> {
                     context.response().setStatusCode(500).end("Error registering user.");
                 });
             }
