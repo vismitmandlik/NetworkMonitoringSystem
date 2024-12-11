@@ -1,6 +1,5 @@
 package com.motadata;
 
-import io.vertx.core.AbstractVerticle;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Vertx;
 import com.motadata.api.Server;
@@ -8,9 +7,15 @@ import com.motadata.db.Initializer;
 
 public class Main
 {
+    static Vertx vertx = Vertx.vertx();
+
+    static public Vertx getVertxInstance(){
+        return vertx;
+    }
     public static void main(String[] args)
     {
-        Vertx vertx = Vertx.vertx();
+
+
 
         Initializer initializer = new Initializer();
 

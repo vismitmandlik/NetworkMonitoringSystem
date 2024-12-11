@@ -44,6 +44,11 @@ public class Server extends AbstractVerticle {
         CredentialProfile credentialProfile = new CredentialProfile();
 
         credentialProfile.initRoutes(router);
+
+        Discovery discovery = new Discovery();
+
+        discovery.initRoutes(router);
+
         // Additional routes can be added here as needed
     }
 }
