@@ -17,16 +17,11 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Discovery extends AbstractVerticle {
+public class Discovery  {
 
     private static NetClient netClient;
 
     static Vertx vertx = Main.getVertxInstance();
-
-    @Override
-    public void start(Promise<Void> startPromise) {
-        startPromise.complete();
-    }
 
     public static void discovery(RoutingContext context)
     {
@@ -173,61 +168,10 @@ public class Discovery extends AbstractVerticle {
 
         JsonObject query = new JsonObject().put("_id", credentialsId);
 
-        Operations.findOne("credentials", query).onSuccess(existingCredential -> {
-            if (existingCredential != null) {
-                promise.complete(existingCredential);
-            } else {
-                promise.complete(null); // Return null if no credential found
-            }
-        }).onFailure(err -> {
-            promise.fail(err.getMessage());
-        });
+        // Return null if no credential found
+        Operations.findOne("credentials", query).onSuccess(promise::complete).onFailure(err -> promise.fail(err.getMessage()));
 
         return promise.future().result(); // This should be handled asynchronously in a real application
-    }
-
-    private static Future<Boolean> executeSshCommand(String ip, int port, JsonArray credentials)
-    {
-        return Future.future(promise ->
-        {
-            vertx.executeBlocking(future ->
-            {
-                try {
-                    ProcessBuilder processBuilder = new ProcessBuilder();
-                    processBuilder.directory(new java.io.File("/home/vismit/learning/new/Golang/GoSpawn/cmd"));
-
-                    for (int i = 0; i < credentials.size(); i++) {
-                        JsonObject cred = credentials.getJsonObject(i);
-                        String username = cred.getString("username");
-                        String password = cred.getString("password");
-
-                        // Build the command with SSH and credentials
-                        processBuilder.command("go", "run", "ssh_command.go", ip, String.valueOf(port), username, password);
-
-                        Process process = processBuilder.start();
-
-                        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-
-                        String line;
-
-                        while ((line = reader.readLine()) != null) {
-                            System.out.println(line); // Log output or handle as needed
-                        }
-
-                        int exitCode = process.waitFor();
-                        if (exitCode == 0) {
-                            promise.complete(); // SSH successful
-                            return; // Exit after success
-                        }
-                    }
-
-                    promise.fail("SSH command failed for all credentials.");
-                } catch (Exception e) {
-                    promise.fail("Error executing SSH command: " + e.getMessage());
-                }
-
-            }, promise);
-        });
     }
 
     private static List<String> extractIpAddresses(String ipRange)
