@@ -194,7 +194,7 @@ public class Discovery extends AbstractVerticle {
             {
                 try {
                     ProcessBuilder processBuilder = new ProcessBuilder();
-                    processBuilder.directory(new java.io.File("/home/vismit/learning/Golang/GoSpawn/cmd"));
+                    processBuilder.directory(new java.io.File("/home/vismit/learning/new/Golang/GoSpawn/cmd"));
 
                     for (int i = 0; i < credentials.size(); i++) {
                         JsonObject cred = credentials.getJsonObject(i);
@@ -277,7 +277,7 @@ public class Discovery extends AbstractVerticle {
             vertx.executeBlocking(future -> {
                 try {
                     ProcessBuilder processBuilder = new ProcessBuilder();
-                    processBuilder.directory(new java.io.File("/home/vismit/learning/Golang/GoSpawn/cmd"));
+                    processBuilder.directory(new java.io.File("/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd"));
                     processBuilder.command("go", "run", "ssh_command.go", ipCredentialObject.encode()); // Pass JSON encoded pairs
 
                     Process process = processBuilder.start();

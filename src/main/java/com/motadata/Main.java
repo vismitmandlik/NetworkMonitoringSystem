@@ -9,8 +9,10 @@ public class Main
 {
     static Vertx vertx = Vertx.vertx();
 
-    static public Vertx getVertxInstance(){
+    static public Vertx getVertxInstance()
+    {
         return vertx;
+
     }
     public static void main(String[] args)
     {
