@@ -16,12 +16,10 @@ public class Auth {
         {
             synchronized (Auth.class)
             {
-                JWTAuthOptions options = new JWTAuthOptions()
-                        .addPubSecKey(new PubSecKeyOptions()
+                jwtAuth = JWTAuth.create(vertx, new JWTAuthOptions()
+                                .addPubSecKey(new PubSecKeyOptions()
                                 .setAlgorithm("HS256")
-                                .setBuffer("your_secret_key")); // Set your secret key
-
-                jwtAuth = JWTAuth.create(vertx, options);
+                                .setBuffer("your_secret_key")));
             }
         }
     }

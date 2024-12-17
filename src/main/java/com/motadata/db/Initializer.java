@@ -8,7 +8,7 @@ public class Initializer
 {
     private static MongoClient mongoClient;
 
-    Vertx vertx = Vertx.vertx();
+    private final Vertx vertx = Vertx.vertx();
 
     public void initMongoClient()
     {
@@ -16,10 +16,14 @@ public class Initializer
                 .put("connection_string", "mongodb://localhost:27017")
                 .put("db_name", "nms_db"));
 
-        mongoClient.runCommand("ping", new JsonObject().put("ping", 1), res -> {
-            if (res.succeeded()) {
+        mongoClient.runCommand("ping", new JsonObject().put("ping", 1), res ->
+        {
+            if (res.succeeded())
+            {
                 System.out.println("Connected to MongoDB  " );
-            } else {
+            }
+            else
+            {
                 System.err.println("Failed to connect: " + res.cause().getMessage());
             }
         });

@@ -14,15 +14,14 @@ public class Main
         return vertx;
 
     }
+
     public static void main(String[] args)
     {
-        Initializer initializer = new Initializer();
+        var initializer = new Initializer();
 
         initializer.initMongoClient();
 
-        DeploymentOptions options = new DeploymentOptions();
-
-        vertx.deployVerticle(Server.class.getName(), options, res ->
+        vertx.deployVerticle(Server.class.getName(), new DeploymentOptions(), res ->
         {
             if (res.succeeded())
             {

@@ -1,7 +1,7 @@
+
 package com.motadata.services;
 
 import io.vertx.core.Vertx;
-import io.vertx.core.AbstractVerticle;
 import io.vertx.core.CompositeFuture;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
@@ -17,51 +17,73 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Discovery  {
-
+public class Discovery
+{
     private static NetClient netClient;
 
     static Vertx vertx = Main.getVertxInstance();
 
     public static void discovery(RoutingContext context)
     {
-        JsonObject requestBody = context.body().asJsonObject();
+        var requestBody = context.body().asJsonObject();
 
-        String ipRange = requestBody.getString("ip");
+        var ipRange = requestBody.getString("ip");
 
         int port = requestBody.getInteger("port");
 
-        JsonArray credentialsIds = requestBody.getJsonArray("credentialsIds");
+        var credentialsIds = requestBody.getJsonArray("credentialsIds");
 
-        List<String> ips = extractIpAddresses(ipRange);
+        var ips = extractIpAddresses(ipRange);
 
-        List<JsonObject> credentialsList = extractCredentials(credentialsIds);
+        var credentialsList = extractCredentials(credentialsIds);
 
-        List<Future> futures = new ArrayList<>(); // Store results for each IP
+        var futures = new ArrayList<Future>(); // Store results for each IP
 
-        for (String ip : ips)
+        for (var ip : ips)
         {
             // Create a result object for this IP
-            JsonObject result = new JsonObject().put("ip", ip);
+            var result = new JsonObject().put("ip", ip);
 
-            Future<JsonObject> future = pingIp(ip).compose(isReachable ->
+            var future = pingIp(ip).compose(isReachable ->
             {
+                System.out.println("Inside compose");
+
+                try
+                {
+                    Thread.sleep(4000);
+                }
+                catch (InterruptedException e)
+                {
+                    throw new RuntimeException(e);
+                }
+
                 if (isReachable)
                 {
                     return checkPort(ip, port).compose(isOpen ->
                     {
                         if (isOpen)
                         {
-                            JsonObject ipCredentialObject = new JsonObject()
+                            var ipCredentialObject = new JsonObject()
                                     .put("ip", ip)
                                     .put("port", port)
                                     .put("credentials", new JsonArray(credentialsList));
 
-                            // Spawn Go process with IP and credentials
-                            return spawnGoProcess(ipCredentialObject).map(success -> {
-                                if (success) {
+//                            System.out.println("JSON passed to Go process: " + ipCredentialObject.encode());
+
+                            // Spawn Go process with IP and
+                            return spawnGoProcess(ipCredentialObject).map(successCredential ->
+                            {
+                                System.out.println("Success credentials : " + successCredential);
+
+                                if (successCredential != null)
+                                {
+                                    // If SSH succeeded and returned a credential
                                     result.put("status", "success");
-                                } else {
+
+                                    storeDiscoveryData(ip, port, successCredential);
+                                }
+                                else
+                                {
                                     result.put("status", "failed").put("reason", "SSH failed");
                                 }
                                 return result;
@@ -92,18 +114,27 @@ public class Discovery  {
         // Combine all futures and handle completion
         CompositeFuture.all(futures).onComplete(ar ->
         {
-            JsonArray results = new JsonArray();
+            System.out.println("Inside Composite all -------------");
 
-            for (Future<JsonObject> future : futures)
+            var results = new JsonArray();
+
+            for (int i = 0; i < futures.size(); i++)
             {
+                var future = futures.get(i);
+
+                var ip = ips.get(i); // Map IPs based on their sequence
+
                 if (future.succeeded())
                 {
-                    results.add(future.result()); // Collect all successful results
+                    results.add(future.result()); // Add successful results
                 }
                 else
                 {
-                    // If a future failed, add its result indicating failure
-                    results.add(new JsonObject().put("ip", future.cause() != null ? future.cause().getMessage() : "Unknown error").put("status", "failed"));
+                    // Add failure or processing status with the correct IP
+                    results.add(new JsonObject()
+                            .put("ip", ip)
+                            .put("status", future.cause() != null ? "failed" : "processing")
+                            .put("message", future.cause() != null ? future.cause().getMessage() : "Discovery started"));
                 }
             }
 
@@ -114,31 +145,46 @@ public class Discovery  {
 
     private static Future<Boolean> pingIp(String ip)
     {
-        Promise<Boolean> promise = Promise.promise();
-
-        vertx.executeBlocking(future ->
+        return vertx.executeBlocking(() ->
         {
-            try {
-                ProcessBuilder processBuilder = new ProcessBuilder("ping", "-c", "1", ip);
-                Process process = processBuilder.start();
-                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                StringBuilder output = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
+            try
+            {
+                var processBuilder = new ProcessBuilder("ping", "-c", "1", ip);
+
+                var process = processBuilder.start();
+
+                var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+                var output = new StringBuilder();
+
+                var line = "";
+
+                while ((line = reader.readLine()) != null)
+                {
                     output.append(line).append("\n");
                 }
+
                 int exitCode = process.waitFor();
-                if (exitCode == 0) {
-                    future.complete(true);
-                } else {
-                    System.err.println("Ping failed for " + ip + ":\n" + output.toString());
-                    future.complete(false);
+
+                if (exitCode == 0)
+                {
+                    return true; // Ping was successful
                 }
-            } catch (Exception e) {
-                future.fail(e);
+                else
+                {
+                    System.err.println("Ping failed for " + ip + ":\n" + output.toString());
+
+                    return false; // Ping failed
+                }
             }
-        }, promise);
-        return promise.future();
+            catch (Exception exception)
+            {
+                // Handle exception
+                exception.printStackTrace();
+
+                return false; // Return false on exception
+            }
+        });
     }
 
     private static Future<Boolean> checkPort(String ip, int port)
@@ -155,44 +201,55 @@ public class Discovery  {
             }
             else
             {
+                System.err.println("Failed to connect to " + ip + ":" + port + " - " + res.cause().getMessage());
+
                 promise.complete(false);
             }
         });
+
         return promise.future();
     }
 
-    private static JsonObject retrieveCredentialById(String credentialsId)
+    private static Future<JsonObject> retrieveCredentialById(String credentialsId)
     {
         // Simulate fetching a credential from the database based on the ID
-        Promise<JsonObject> promise = Promise.promise();
+        var promise = Promise.<JsonObject>promise();
 
-        JsonObject query = new JsonObject().put("_id", credentialsId);
+        var query = new JsonObject().put("_id", credentialsId);
 
         // Return null if no credential found
         Operations.findOne("credentials", query).onSuccess(promise::complete).onFailure(err -> promise.fail(err.getMessage()));
 
-        return promise.future().result(); // This should be handled asynchronously in a real application
+        return promise.future(); // This should be handled asynchronously in a real application
     }
 
-    private static List<String> extractIpAddresses(String ipRange)
+    private static ArrayList<String> extractIpAddresses(String ipRange)
     {
-        List<String> ipList = new ArrayList<>();
+        var ipList = new ArrayList<String>();
 
         // Check if the input is a range (contains '-')
-        if (ipRange.contains("-")) {
-            String[] parts = ipRange.split("\\.");
-            String baseIp = parts[0] + "." + parts[1] + "." + parts[2]; // Get first three octets
-            String startOctet = parts[3].split("-")[0]; // Get starting octet
-            String endOctet = parts[3].split("-")[1]; // Get ending octet
+        if (ipRange.contains("-"))
+        {
+            var parts = ipRange.split("\\.");
 
-            int start = Integer.parseInt(startOctet);
-            int end = Integer.parseInt(endOctet);
+            var baseIp = parts[0] + "." + parts[1] + "." + parts[2]; // Get first three octets
+
+            var startOctet = parts[3].split("-")[0]; // Get starting octet
+
+            var endOctet = parts[3].split("-")[1]; // Get ending octet
+
+            var start = Integer.parseInt(startOctet);
+
+            var end = Integer.parseInt(endOctet);
 
             // Generate IPs from baseIp + start to baseIp + end
-            for (int i = start; i <= end; i++) {
+            for (int i = start; i <= end; i++)
+            {
                 ipList.add(baseIp + "." + i);
             }
-        } else {
+        }
+        else
+        {
             // If not a range, just add the single IP
             ipList.add(ipRange.trim());
         }
@@ -202,53 +259,149 @@ public class Discovery  {
 
     private static List<JsonObject> extractCredentials(JsonArray credentialsIds)
     {
-        List<JsonObject> credentialsList = new ArrayList<>();
+        var credentialsList = new ArrayList<JsonObject>();
 
-        for (int i = 0; i < credentialsIds.size(); i++) {
-            String credId = credentialsIds.getString(i);
-            JsonObject credential = retrieveCredentialById(credId);
-            if (credential != null) {
-                credentialsList.add(credential);
+        var futures = new ArrayList<Future>();
+
+        // Using executeBlocking to handle blocking code
+        vertx.executeBlocking(blockingPromise ->
+        {
+            for (int i = 0; i < credentialsIds.size(); i++)
+            {
+                var credId = credentialsIds.getString(i);
+
+                var credentialFuture = retrieveCredentialById(credId);
+
+                futures.add(credentialFuture);
+
+                credentialFuture.onSuccess(credential ->
+                {
+                    if (credential != null)
+                    {
+                        credentialsList.add(credential);
+                    }
+                });
             }
-        }
 
+            CompositeFuture.all(futures).onComplete(res ->
+            {
+                if (res.succeeded())
+                {
+                    blockingPromise.complete();
+                }
+                else
+                {
+                    blockingPromise.fail(res.cause());
+                }
+            });
+        }, false, res ->
+        {
+            if (res.succeeded())
+            {
+                System.out.println("Successfully extracted credentials");
+            }
+            else
+            {
+                System.err.println("Failed to extract credentials: " + res.cause());
+            }
+        });
         return credentialsList;
     }
 
-    private static Future<Boolean> spawnGoProcess(JsonObject ipCredentialObject)
+    private static Future<JsonObject> spawnGoProcess(JsonObject ipCredentialObject)
     {
-        return Future.future(promise -> {
-            vertx.executeBlocking(future -> {
-                try {
-                    ProcessBuilder processBuilder = new ProcessBuilder();
-                    processBuilder.directory(new java.io.File("/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd"));
-                    processBuilder.command("go", "run", "ssh_command.go", ipCredentialObject.encode()); // Pass JSON encoded pairs
+        return vertx.executeBlocking(promise ->
+        {
+            try
+            {
+                ProcessBuilder processBuilder = new ProcessBuilder();
 
-                    Process process = processBuilder.start();
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                processBuilder.directory(new java.io.File("/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd"));
 
-                    String line;
-                    StringBuilder output = new StringBuilder();
+                processBuilder.command("go", "run", "ssh_command.go",  ipCredentialObject.encode() ); // Pass JSON encoded pairs
 
-                    while ((line = reader.readLine()) != null) {
-                        output.append(line).append("\n"); // Capture output from Go program
+                Process process = processBuilder.start();
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+                StringBuilder output = new StringBuilder();
+
+                String line;
+
+                String successfulCredential = "";
+
+                while ((line = reader.readLine()) != null)
+                {
+                    output.append(line).append("\n"); // Capture output from Go program
+
+                    // Check for the success message that contains credentials
+                    if (line.contains("Successful login for IP"))
+                    {
+                        // Extract the credentials from the line (e.g., after the colon)
+                        String credentialsString = line.substring(line.indexOf("{"));
+
+                        successfulCredential = credentialsString.trim();
                     }
-
-                    int exitCode = process.waitFor();
-
-                    if (exitCode == 0) {
-                        System.out.println(output.toString()); // Log output on success
-                        future.complete(true); // Complete with success
-                    } else {
-                        System.err.println("Go process failed with exit code: " + exitCode);
-                        future.complete(false); // Complete with failure
-                    }
-                } catch (Exception e) {
-                    future.fail("Error starting Go process: " + e.getMessage());
                 }
-            }, promise); // Pass the original promise to complete it later
+
+                System.out.println("Output: " + output);
+
+                int exitCode = process.waitFor();
+
+                if (exitCode == 0 )
+                {
+                    JsonObject result = new JsonObject(successfulCredential);
+
+                    System.out.println("Success credentials are : " + result );
+
+                    promise.complete(result); // Return the successful credential as JsonObject
+                }
+
+                else
+                {
+                    System.err.println("Go process failed with exit code: " + exitCode);
+
+                    promise.fail("Go process failed with exit code: " + exitCode);
+                }
+            }
+            catch (Exception e)
+            {
+                System.err.println("Error starting Go process: " + e.getMessage());
+
+                promise.fail(e);
+            }
         });
     }
 
+    private static void storeDiscoveryData(String ip, int port, JsonObject credential)
+    {
+        // Query to check for duplicates
+        JsonObject query = new JsonObject().put("ip", ip);
 
+        // Check for existing entry
+        Operations.findOne("objects", query).onSuccess(existingEntry ->
+        {
+            if (existingEntry == null)
+            {
+                // No duplicate found, insert the new data
+                JsonObject discoveryData = new JsonObject()
+                        .put("ip", ip)
+                        .put("credentials", credential)
+                        .put("port", port);
+
+                Operations.insert("objects", discoveryData).onSuccess(result ->
+                        System.out.println("Successfully stored discovery data: " + discoveryData.encodePrettily())
+                ).onFailure(err ->
+                        System.err.println("Failed to store discovery data: " + err.getMessage())
+                );
+            }
+            else
+            {
+                // Duplicate found, log the information
+                System.out.println("Duplicate entry found for IP: " + ip + ", Port: " + port);
+            }
+        }).onFailure(err ->
+                System.err.println("Failed to check for duplicate entry: " + err.getMessage())
+        );
+    }
 }

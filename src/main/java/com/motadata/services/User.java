@@ -7,23 +7,22 @@ import io.vertx.ext.auth.JWTOptions;
 import io.vertx.ext.auth.jwt.JWTAuth;
 import io.vertx.ext.web.RoutingContext;
 
-public class User
+public class    User
 {
     private static final String USERS_COLLECTION = "users";
 
     static JWTAuth jwtAuth = Auth.getJwtAuth();
 
-
     // Register a new user
     public static void register(RoutingContext context)
     {
-        JsonObject requestBody = context.body().asJsonObject();
+        var requestBody = context.body().asJsonObject();
 
-        String username = requestBody.getString("username");
+        var username = requestBody.getString("username");
 
-        String password = requestBody.getString("password");
+        var password = requestBody.getString("password");
 
-        JsonObject query = new JsonObject().put("username", username);
+        var query = new JsonObject().put("username", username);
 
         // Check if user already exists
         Operations.findOne(USERS_COLLECTION, query).onSuccess(existingUser ->
@@ -41,7 +40,8 @@ public class User
                     context.response().setStatusCode(500).end("Error registering user.");
                 });
             }
-        }).onFailure(err -> {
+        }).onFailure(err ->
+        {
             context.response().setStatusCode(500).end("Error checking user existence.");
         });
     }
