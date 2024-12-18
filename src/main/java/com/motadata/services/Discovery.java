@@ -25,6 +25,12 @@ public class Discovery
 
     public static void discovery(RoutingContext context)
     {
+        System.out.println(Thread.currentThread().getName());
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         var requestBody = context.body().asJsonObject();
 
         var ipRange = requestBody.getString("ip");

@@ -92,7 +92,7 @@ public class ObjectManager {
                         // Successful output
                         var outputJson = new JsonArray(outputLines);
 
-                        System.out.println(outputJson);
+                        System.out.println("Go output" + outputJson);
 
                         storePollerResults(outputJson);
 
@@ -164,20 +164,24 @@ public class ObjectManager {
 
     private static void storePollerResults(JsonArray pollerResults)
     {
-        vertx.executeBlocking(promise -> {
+        vertx.executeBlocking(promise ->
+        {
             try {
-                long timestamp = System.currentTimeMillis();  // Current timestamp
+                var timestamp = System.currentTimeMillis();  // Current timestamp
 
-                for (int i = 0; i < pollerResults.size(); i++) {
-                    try {
+                for (int i = 0; i < pollerResults.size(); i++)
+                {
+                    try
+                    {
                         // Parse each line as a JSON object directly
                         JsonObject result = new JsonObject(pollerResults.getString(i));
 
                         // Extract required fields
                         String deviceId = result.getString("deviceId");
-                        double cpuUsage = result.getDouble("cpuUsage", 0.0);
-                        double memoryUsage = result.getDouble("memoryUsage", 0.0);
-                        double diskUsage = result.getDouble("diskUsage", 0.0);
+                        String Ip = result.getString("ip");
+                        double cpuUsage = parseUsage(result.getString("cpuUsage"));
+                        double memoryUsage = parseUsage(result.getString("memoryUsage"));
+                        double diskUsage = parseDiskUsage(result.getString("diskUsage"));
 
                         // Check for missing deviceId
                         if (deviceId == null || deviceId.isEmpty()) {
@@ -188,6 +192,7 @@ public class ObjectManager {
                         // Create a data object to store
                         JsonObject dataToStore = new JsonObject()
                                 .put("deviceId", deviceId)
+                                .put("ip", Ip)
                                 .put("cpuUsage", cpuUsage)
                                 .put("memoryUsage", memoryUsage)
                                 .put("diskUsage", diskUsage)
@@ -206,17 +211,43 @@ public class ObjectManager {
                 }
 
                 promise.complete(); // Task completed successfully
-            } catch (Exception e) {
+            }
+            catch (Exception e)
+            {
                 promise.fail(e); // Handle any top-level exception
             }
-        }).onSuccess(v -> {
+        }).onSuccess(v ->
+        {
             System.out.println("All poller results stored successfully.");
-        }).onFailure(err -> {
+        }).onFailure(err ->
+        {
             System.err.println("Error storing poller results: " + err.getMessage());
         });
     }
 
+    // Helper method to parse CPU/Memory usage strings (like "12.40")
+    private static double parseUsage(String usage)
+    {
+        try
+        {
+            return Double.parseDouble(usage);
+        }
+        catch (NumberFormatException e)
+        {
+            return 0.0;  // Return 0.0 if parsing fails
+        }
+    }
 
-
-
+    // Helper method to parse disk usage percentages (like "5%")
+    private static double parseDiskUsage(String diskUsage)
+    {
+        try
+        {
+            return Double.parseDouble(diskUsage.replace("%", ""));
+        }
+        catch (NumberFormatException e)
+        {
+            return 0.0;  // Return 0.0 if parsing fails
+        }
+    }
 }
