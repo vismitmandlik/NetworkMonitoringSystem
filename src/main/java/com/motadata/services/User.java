@@ -11,7 +11,7 @@ public class    User
 {
     private static final String USERS_COLLECTION = "users";
 
-    private static final JWTAuth jwtAuth = Auth.getJwtAuth();
+    private static final JWTAuth JWTAUT = Auth.getJwtAuth();
 
     // Register a new user
     public static void register(RoutingContext context)
@@ -61,7 +61,7 @@ public class    User
                 {
                     var jwtOptions = new JWTOptions().setExpiresInSeconds(3600);
 
-                    var token = jwtAuth.generateToken(new JsonObject().put("username", username), jwtOptions);
+                    var token = JWTAUT.generateToken(new JsonObject().put("username", username), jwtOptions);
 
                     context.response().putHeader("Content-Type", "application/json").end(new JsonObject().put("token", token).encode());
                 }

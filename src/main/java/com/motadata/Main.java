@@ -14,7 +14,7 @@ public class Main
 {
     static Vertx vertx = Vertx.vertx();
 
-    public static Vertx getVertxInstance()
+    public static Vertx vertx()
     {
         return vertx;
     }
@@ -40,12 +40,9 @@ public class Main
             }
 
             var config = configResult.result();
+            
+            Initializer.initMongoClient(config);
 
-            var initializer = new Initializer();
-
-            initializer.initMongoClient(config);
-
-            // Deploy Discovery Verticle with the configuration
             var discoveryOptions = new DeploymentOptions().setConfig(config);
 
             // Deploy Discovery Verticle

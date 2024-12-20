@@ -16,7 +16,7 @@ import java.util.List;
 public class ObjectManager
 {
 
-    static Vertx vertx = Main.getVertxInstance();
+    static Vertx vertx = Main.vertx();
 
     public static void provisionDevices(RoutingContext context)
     {
@@ -37,7 +37,8 @@ public class ObjectManager
 
         fetchDeviceDetails(deviceIds).onSuccess(devices ->
         {
-            for (JsonObject device : devices) {
+            for (JsonObject device : devices)
+            {
                 startPollingTask(device, event, pollInterval);
             }
 

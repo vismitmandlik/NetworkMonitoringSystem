@@ -1,6 +1,7 @@
 package com.motadata.api;
 
 import com.motadata.configs.Auth;
+import com.motadata.constants.Constants;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
@@ -26,21 +27,21 @@ public class Server extends AbstractVerticle
 
         Auth.initialize(vertx,config);
 
-        var port = config.getInteger("http_port", 8080);
+        var port = config.getInteger("http_port", Constants.HTTP_PORT);
 
         router = Router.router(vertx);
 
         setupRoutes();
 
-        vertx.createHttpServer().requestHandler(router).listen(port, res ->
+        vertx.createHttpServer().requestHandler(router).listen(port, response ->
         {
-            if (res.succeeded())
+            if (response.succeeded())
             {
                 System.out.println("Server started on port 8080");
             }
             else
             {
-                System.err.println("Failed to start server: " + res.cause());
+                System.err.println("Failed to start server: " + response.cause());
             }
         });
     }

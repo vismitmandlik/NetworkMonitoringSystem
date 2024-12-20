@@ -21,7 +21,7 @@ public class Discovery extends AbstractVerticle
     }
 
 
-    static Vertx vertx = Main.getVertxInstance();
+    static Vertx vertx = Main.vertx();
 
     private static final NetClient netClient = vertx.createNetClient();
 
