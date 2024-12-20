@@ -2,24 +2,37 @@ package com.motadata.api;
 
 import com.motadata.configs.Auth;
 import io.vertx.core.AbstractVerticle;
-//import io.vertx.core.http.HttpServer;
+import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 
 public class Server extends AbstractVerticle
 {
-
     private Router router;
 
     @Override
     public void start()
     {
-        Auth.initialize(vertx);
+        // Get configuration from the Vert.x context (set in Main)
+        JsonObject config = vertx.getOrCreateContext().config();
+
+        if (config == null)
+        {
+            System.err.println("Failed to load configuration");
+
+            return;
+        }
+
+        System.out.println("Loaded all Configs");
+
+        Auth.initialize(vertx,config);
+
+        var port = config.getInteger("http_port", 8080);
 
         router = Router.router(vertx);
 
         setupRoutes();
 
-        vertx.createHttpServer().requestHandler(router).listen(8080, res ->
+        vertx.createHttpServer().requestHandler(router).listen(port, res ->
         {
             if (res.succeeded())
             {
@@ -34,20 +47,14 @@ public class Server extends AbstractVerticle
 
     private void setupRoutes()
     {
-        // API routes for user
 
         User.initRoutes(router);
 
-        // API routes for credentialProfile
-
         CredentialProfile.initRoutes(router);
-
-        // API routes for discovery
 
         Discovery.initRoutes(router);
 
         Object.initRoutes(router);
 
-        // Additional routes can be added here as needed
     }
 }

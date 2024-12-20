@@ -11,7 +11,7 @@ public class    User
 {
     private static final String USERS_COLLECTION = "users";
 
-    static JWTAuth jwtAuth = Auth.getJwtAuth();
+    private static final JWTAuth jwtAuth = Auth.getJwtAuth();
 
     // Register a new user
     public static void register(RoutingContext context)
@@ -36,14 +36,9 @@ public class    User
                 JsonObject newUser = new JsonObject().put("username", username).put("password", password);
 
                 // Insert new user
-                Operations.insert(USERS_COLLECTION, newUser).onSuccess(id -> context.response().setStatusCode(201).end("User registered successfully.")).onFailure(err -> {
-                    context.response().setStatusCode(500).end("Error registering user.");
-                });
+                Operations.insert(USERS_COLLECTION, newUser).onSuccess(id -> context.response().setStatusCode(201).end("User registered successfully.")).onFailure(err -> context.response().setStatusCode(500).end("Error registering user."));
             }
-        }).onFailure(err ->
-        {
-            context.response().setStatusCode(500).end("Error checking user existence.");
-        });
+        }).onFailure(err -> context.response().setStatusCode(500).end("Error checking user existence."));
     }
 
     // User login and JWT token generation
@@ -68,9 +63,7 @@ public class    User
 
                     String token = jwtAuth.generateToken(new JsonObject().put("username", username), jwtOptions);
 
-                    context.response()
-                            .putHeader("Content-Type", "application/json")
-                            .end(new JsonObject().put("token", token).encode());
+                    context.response().putHeader("Content-Type", "application/json").end(new JsonObject().put("token", token).encode());
                 }
                 else
                 {
@@ -81,9 +74,6 @@ public class    User
             {
                 context.response().setStatusCode(404).end("User not found");
             }
-        }).onFailure(err ->
-        {
-            context.response().setStatusCode(500).end("Error checking user credentials.");
-        });
+        }).onFailure(err -> context.response().setStatusCode(500).end("Error checking user credentials."));
     }
 }

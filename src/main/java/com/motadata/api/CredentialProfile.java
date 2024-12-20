@@ -10,6 +10,7 @@ import io.vertx.ext.web.handler.JWTAuthHandler;
 public class CredentialProfile {
 
     private static final JWTAuth jwtAuth = Auth.getJwtAuth();
+
     // Method to register routes
     public static void initRoutes(Router router)
     {
@@ -17,6 +18,7 @@ public class CredentialProfile {
 
         router.get("/api/credentials").handler(JWTAuthHandler.create(jwtAuth)).handler(com.motadata.services.CredentialProfile::getAllCredentials);
 
+        // TODO - service
         router.get("/api/credentials/:id").handler(JWTAuthHandler.create(jwtAuth)).handler(com.motadata.services.CredentialProfile::findCredentials);
     }
 }

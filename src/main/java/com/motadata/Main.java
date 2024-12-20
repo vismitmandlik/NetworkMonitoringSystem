@@ -1,9 +1,14 @@
 package com.motadata;
 
+import com.motadata.services.Discovery;
+import io.vertx.config.ConfigRetriever;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Vertx;
 import com.motadata.api.Server;
 import com.motadata.db.Initializer;
+
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class Main
 {
@@ -12,25 +17,62 @@ public class Main
     static public Vertx getVertxInstance()
     {
         return vertx;
-
     }
 
     public static void main(String[] args)
     {
-        var initializer = new Initializer();
 
-        initializer.initMongoClient();
+        // Load configuration from config.json only once
+        ConfigRetriever retriever = ConfigRetriever.create(vertx);
 
-        vertx.deployVerticle(Server.class.getName(), new DeploymentOptions(), res ->
+        // Suppress MongoDB logs
+        Logger mongoLogger = Logger.getLogger("org.mongodb.driver");
+
+        mongoLogger.setLevel(Level.OFF);
+
+        retriever.getConfig(configResult ->
         {
-            if (res.succeeded())
+            if (configResult.failed())
             {
-                System.out.println("Successfully deployed Server Verticle");
+                System.err.println("Failed to load configuration: " + configResult.cause());
+
+                return;
             }
-            else
+
+            var config = configResult.result();
+
+            var initializer = new Initializer();
+
+            initializer.initMongoClient(config);
+
+            // Deploy Discovery Verticle with the configuration
+            DeploymentOptions discoveryOptions = new DeploymentOptions().setConfig(config);
+
+            // Deploy Discovery Verticle
+            vertx.deployVerticle(new Discovery(),discoveryOptions, response ->
             {
-                System.out.println("Failed to deploy MyVerticle: " + res.cause());
-            }
+                if (response.succeeded())
+                {
+                    System.out.println("Successfully deployed Discovery Verticle");
+                }
+                else
+                {
+                    System.err.println("Failed to deploy Discovery Verticle: " + response.cause());
+                }
+            });
+
+            // Deploy Server Verticle
+            vertx.deployVerticle(Server.class.getName(),discoveryOptions, response ->
+            {
+                if (response.succeeded())
+                {
+                    System.out.println("Successfully deployed Server Verticle");
+                }
+                else
+                {
+                    System.out.println("Failed to deploy Server Verticle: " + response.cause());
+                }
+            });
         });
     }
 }

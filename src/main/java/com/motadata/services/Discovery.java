@@ -1,10 +1,7 @@
 
 package com.motadata.services;
 
-import io.vertx.core.Vertx;
-import io.vertx.core.CompositeFuture;
-import io.vertx.core.Future;
-import io.vertx.core.Promise;
+import io.vertx.core.*;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
@@ -17,21 +14,21 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Discovery
+public class Discovery extends AbstractVerticle
 {
-    private static NetClient netClient;
+    @Override
+    public void start() {
+        vertx.eventBus().consumer("discovery.request", this::discovery);
+    }
+
 
     static Vertx vertx = Main.getVertxInstance();
 
-    public static void discovery(RoutingContext context)
+    private static final NetClient netClient = vertx.createNetClient();
+
+    public void discovery(io.vertx.core.eventbus.Message<Object> message)
     {
-        System.out.println(Thread.currentThread().getName());
-        try {
-            Thread.sleep(3000);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-        var requestBody = context.body().asJsonObject();
+        var requestBody = (JsonObject) message.body();
 
         var ipRange = requestBody.getString("ip");
 
@@ -45,6 +42,9 @@ public class Discovery
 
         var futures = new ArrayList<Future>(); // Store results for each IP
 
+        message.reply(new JsonObject().put("status", "Discovery started"));
+
+
         for (var ip : ips)
         {
             // Create a result object for this IP
@@ -52,17 +52,6 @@ public class Discovery
 
             var future = pingIp(ip).compose(isReachable ->
             {
-                System.out.println("Inside compose");
-
-                try
-                {
-                    Thread.sleep(4000);
-                }
-                catch (InterruptedException e)
-                {
-                    throw new RuntimeException(e);
-                }
-
                 if (isReachable)
                 {
                     return checkPort(ip, port).compose(isOpen ->
@@ -74,9 +63,7 @@ public class Discovery
                                     .put("port", port)
                                     .put("credentials", new JsonArray(credentialsList));
 
-//                            System.out.println("JSON passed to Go process: " + ipCredentialObject.encode());
-
-                            // Spawn Go process with IP and
+                            // Spawn Go process with IP
                             return spawnGoProcess(ipCredentialObject).map(successCredential ->
                             {
                                 System.out.println("Success credentials : " + successCredential);
@@ -115,38 +102,15 @@ public class Discovery
             });
 
             futures.add(future);
+
+            future.onComplete(ar -> {
+                if (ar.succeeded()) {
+                    System.out.println("Discovery result for IP " + ip + ": " + ar.result().encodePrettily());
+                } else {
+                    System.err.println("Error during discovery for IP " + ip + ": " + ar.cause().getMessage());
+                }
+            });
         }
-
-        // Combine all futures and handle completion
-        CompositeFuture.all(futures).onComplete(ar ->
-        {
-            System.out.println("Inside Composite all -------------");
-
-            var results = new JsonArray();
-
-            for (int i = 0; i < futures.size(); i++)
-            {
-                var future = futures.get(i);
-
-                var ip = ips.get(i); // Map IPs based on their sequence
-
-                if (future.succeeded())
-                {
-                    results.add(future.result()); // Add successful results
-                }
-                else
-                {
-                    // Add failure or processing status with the correct IP
-                    results.add(new JsonObject()
-                            .put("ip", ip)
-                            .put("status", future.cause() != null ? "failed" : "processing")
-                            .put("message", future.cause() != null ? future.cause().getMessage() : "Discovery started"));
-                }
-            }
-
-            // Send response with all results
-            context.response().setStatusCode(200).end(results.encodePrettily());
-        });
     }
 
     private static Future<Boolean> pingIp(String ip)
@@ -178,9 +142,9 @@ public class Discovery
                 }
                 else
                 {
-                    System.err.println("Ping failed for " + ip + ":\n" + output.toString());
+                    System.err.println("Ping failed for " + ip + ":\n" + output);
 
-                    return false; // Ping failed
+                    return false;
                 }
             }
             catch (Exception exception)
@@ -196,8 +160,6 @@ public class Discovery
     private static Future<Boolean> checkPort(String ip, int port)
     {
         Promise<Boolean> promise = Promise.promise();
-
-        netClient = vertx.createNetClient();
 
         netClient.connect(port, ip, res ->
         {
@@ -320,21 +282,28 @@ public class Discovery
         {
             try
             {
-                ProcessBuilder processBuilder = new ProcessBuilder();
 
-                processBuilder.directory(new java.io.File("/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd"));
+                String goExecutable = "/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd/main";
 
-                processBuilder.command("go", "run", "ssh_command.go",  ipCredentialObject.encode() ); // Pass JSON encoded pairs
+                String eventName = "discovery";
+
+                ProcessBuilder processBuilder = new ProcessBuilder(
+                        goExecutable,
+                        eventName,
+                        ipCredentialObject.encode()
+                );
 
                 Process process = processBuilder.start();
 
+                processBuilder.directory(new java.io.File("/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd"));
+
                 BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 
-                StringBuilder output = new StringBuilder();
+                var output = new StringBuilder();
 
-                String line;
+                var line = "";
 
-                String successfulCredential = "";
+                var successfulCredential = "";
 
                 while ((line = reader.readLine()) != null)
                 {
@@ -410,4 +379,5 @@ public class Discovery
                 System.err.println("Failed to check for duplicate entry: " + err.getMessage())
         );
     }
+
 }

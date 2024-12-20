@@ -14,11 +14,11 @@ public class Impl {
         try
         {
             // Load schema from databaseSchema.json
-            String schemaFile = "./src/main/resources/databaseSchema.json";
+            var schemaFile = "./src/main/resources/databaseSchema.json";
 
-            String jsonString = new String(Files.readAllBytes(Paths.get(schemaFile)));
+            var jsonString = new String(Files.readAllBytes(Paths.get(schemaFile)));
 
-            JsonObject schema = new JsonObject(jsonString);
+            var schema = new JsonObject(jsonString);
 
             // Loop through each collection in the JSON schema
             JsonObject collections = schema.getJsonObject("collections");
@@ -44,9 +44,9 @@ public class Impl {
                 });
             });
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            e.printStackTrace();
+            exception.printStackTrace();
         }
     }
 }
