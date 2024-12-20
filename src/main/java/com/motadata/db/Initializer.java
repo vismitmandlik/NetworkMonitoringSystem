@@ -14,21 +14,20 @@ public class Initializer
 public void initMongoClient(JsonObject config)
     {
         String connectionString = config.getString("connection_string", "mongodb://localhost:27017");
+
         String dbName = config.getString("db_name", "nms_db");
 
-        mongoClient = MongoClient.createShared(vertx, new JsonObject()
-                .put("connection_string", connectionString)
-                .put("db_name", dbName));
+        mongoClient = MongoClient.createShared(vertx, new JsonObject().put("connection_string", connectionString).put("db_name", dbName));
 
-        mongoClient.runCommand("ping", new JsonObject().put("ping", 1), res ->
+        mongoClient.runCommand("ping", new JsonObject().put("ping", 1), response ->
         {
-            if (res.succeeded())
+            if (response.succeeded())
             {
                 System.out.println("Connected to MongoDB  " );
             }
             else
             {
-                System.err.println("Failed to connect: " + res.cause().getMessage());
+                System.err.println("Failed to connect: " + response.cause().getMessage());
             }
         });
     }

@@ -33,24 +33,24 @@ public class    User
             }
             else
             {
-                JsonObject newUser = new JsonObject().put("username", username).put("password", password);
+                var newUser = new JsonObject().put("username", username).put("password", password);
 
                 // Insert new user
                 Operations.insert(USERS_COLLECTION, newUser).onSuccess(id -> context.response().setStatusCode(201).end("User registered successfully.")).onFailure(err -> context.response().setStatusCode(500).end("Error registering user."));
             }
-        }).onFailure(err -> context.response().setStatusCode(500).end("Error checking user existence."));
+        }).onFailure(error -> context.response().setStatusCode(500).end("Error checking user existence." + error));
     }
 
     // User login and JWT token generation
     public static void login(RoutingContext context)
     {
-        JsonObject requestBody = context.body().asJsonObject();
+        var requestBody = context.body().asJsonObject();
 
-        String username = requestBody.getString("username");
+        var username = requestBody.getString("username");
 
-        String password = requestBody.getString("password");
+        var password = requestBody.getString("password");
 
-        JsonObject query = new JsonObject().put("username", username);
+        var query = new JsonObject().put("username", username);
 
         // Find user by username
         Operations.findOne(USERS_COLLECTION, query).onSuccess(user ->
@@ -59,9 +59,9 @@ public class    User
             {
                 if (user.getString("password").equals(password))
                 {
-                    JWTOptions jwtOptions = new JWTOptions().setExpiresInSeconds(3600);
+                    var jwtOptions = new JWTOptions().setExpiresInSeconds(3600);
 
-                    String token = jwtAuth.generateToken(new JsonObject().put("username", username), jwtOptions);
+                    var token = jwtAuth.generateToken(new JsonObject().put("username", username), jwtOptions);
 
                     context.response().putHeader("Content-Type", "application/json").end(new JsonObject().put("token", token).encode());
                 }
@@ -74,6 +74,6 @@ public class    User
             {
                 context.response().setStatusCode(404).end("User not found");
             }
-        }).onFailure(err -> context.response().setStatusCode(500).end("Error checking user credentials."));
+        }).onFailure(error -> context.response().setStatusCode(500).end("Error checking user credentials." + error));
     }
 }

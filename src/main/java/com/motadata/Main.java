@@ -14,7 +14,7 @@ public class Main
 {
     static Vertx vertx = Vertx.vertx();
 
-    static public Vertx getVertxInstance()
+    public static Vertx getVertxInstance()
     {
         return vertx;
     }
@@ -26,7 +26,7 @@ public class Main
         ConfigRetriever retriever = ConfigRetriever.create(vertx);
 
         // Suppress MongoDB logs
-        Logger mongoLogger = Logger.getLogger("org.mongodb.driver");
+        var mongoLogger = Logger.getLogger("org.mongodb.driver");
 
         mongoLogger.setLevel(Level.OFF);
 
@@ -46,7 +46,7 @@ public class Main
             initializer.initMongoClient(config);
 
             // Deploy Discovery Verticle with the configuration
-            DeploymentOptions discoveryOptions = new DeploymentOptions().setConfig(config);
+            var discoveryOptions = new DeploymentOptions().setConfig(config);
 
             // Deploy Discovery Verticle
             vertx.deployVerticle(new Discovery(),discoveryOptions, response ->
@@ -70,7 +70,7 @@ public class Main
                 }
                 else
                 {
-                    System.out.println("Failed to deploy Server Verticle: " + response.cause());
+                    System.err.println("Failed to deploy Server Verticle: " + response.cause());
                 }
             });
         });

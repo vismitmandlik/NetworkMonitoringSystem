@@ -37,13 +37,13 @@ public class ObjectManager
 
         fetchDeviceDetails(deviceIds).onSuccess(devices ->
         {
-            startPollingTask(JsonObject.mapFrom(devices), event, pollInterval);
+            for (JsonObject device : devices) {
+                startPollingTask(device, event, pollInterval);
+            }
 
             context.response().setStatusCode(200).end(successResponse());
-        }).onFailure(err ->
-        {
-            context.response().setStatusCode(500).end(errorResponse(err.getMessage()));
-        });
+
+        }).onFailure(err -> context.response().setStatusCode(500).end(errorResponse(err.getMessage())));
     }
 
     private static boolean isValidRequest(JsonObject requestBody)
@@ -51,10 +51,8 @@ public class ObjectManager
         return requestBody != null && requestBody.containsKey("objectIds") && requestBody.containsKey("pollInterval");
     }
 
-    // Removed the pollingTasks map and the logic related to it
     private static void startPollingTask(JsonObject device, String event, int pollInterval)
     {
-        // Directly start the polling task for each device without using a task map
         System.out.println("Polling task started for device " + device.getString("_id") + " with interval " + pollInterval + " seconds.");
 
         vertx.setPeriodic(pollInterval * 1000L, timerId -> pollDevice(device, event));
@@ -76,7 +74,7 @@ public class ObjectManager
 
                 try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream())))
                 {
-                    String line;
+                    var line = "";
 
                     while ((line = reader.readLine()) != null)
                     {
@@ -90,6 +88,7 @@ public class ObjectManager
                 if (process.exitValue() == 0)
                 {
                     System.out.println("Polling result for device " + device.getString("_id") + ": " + outputLines.encodePrettily());
+
                     storePollerResults(outputLines);
                 }
                 else
@@ -97,11 +96,13 @@ public class ObjectManager
                     System.out.println("Polling failed for device " + device.getString("_id"));
                 }
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                e.printStackTrace();
+                exception.printStackTrace();
             }
+
             return "Poll completed";
+
         }, asyncResult ->
         {
             if (asyncResult.succeeded())
@@ -170,9 +171,9 @@ public class ObjectManager
                     .put("memoryUsage", parseDouble(result.getString("memoryUsage")))
                     .put("diskUsage", parseDouble(result.getString("diskUsage").replace("%", "")));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            System.err.println("Failed to parse poller result: " + pollerResult);
+            System.err.println("Failed to parse poller result: " + pollerResult + exception);
 
             return null;
         }
@@ -184,7 +185,7 @@ public class ObjectManager
         {
             return Double.parseDouble(value);
         }
-        catch (NumberFormatException e)
+        catch (NumberFormatException exception)
         {
             return 0.0;
         }
@@ -197,6 +198,6 @@ public class ObjectManager
 
     private static String successResponse()
     {
-        return new JsonObject().put("message", "Polling tasks started for provisioned devices").toBuffer().toString();
+        return new JsonObject().put("message", "Polling tasks started for provisioned devices").toString();
     }
 }

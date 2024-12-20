@@ -4,7 +4,6 @@ package com.motadata.services;
 import io.vertx.core.*;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.RoutingContext;
 import io.vertx.core.net.NetClient;
 import com.motadata.db.Operations;
 import com.motadata.Main;
@@ -96,18 +95,17 @@ public class Discovery extends AbstractVerticle
 
                     return Future.succeededFuture(result);
                 }
-            }).onFailure(err ->
-            {
-                result.put("status", "failed").put("reason", err.getMessage());
-            });
+            }).onFailure(err -> result.put("status", "failed").put("reason", err.getMessage()));
 
             futures.add(future);
 
-            future.onComplete(ar -> {
-                if (ar.succeeded()) {
-                    System.out.println("Discovery result for IP " + ip + ": " + ar.result().encodePrettily());
-                } else {
-                    System.err.println("Error during discovery for IP " + ip + ": " + ar.cause().getMessage());
+            future.onComplete(AsyncResult -> {
+                if (AsyncResult.succeeded()) {
+                    System.out.println("Discovery result for IP " + ip + ": " + AsyncResult.result().encodePrettily());
+                }
+                else
+                {
+                    System.err.println("Error during discovery for IP " + ip + ": " + AsyncResult.cause().getMessage());
                 }
             });
         }
@@ -283,17 +281,13 @@ public class Discovery extends AbstractVerticle
             try
             {
 
-                String goExecutable = "/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd/main";
+                var goExecutable = "/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd/main";
 
-                String eventName = "discovery";
+                var eventName = "discovery";
 
-                ProcessBuilder processBuilder = new ProcessBuilder(
-                        goExecutable,
-                        eventName,
-                        ipCredentialObject.encode()
-                );
+                var processBuilder = new ProcessBuilder(goExecutable, eventName, ipCredentialObject.encode());
 
-                Process process = processBuilder.start();
+                var process = processBuilder.start();
 
                 processBuilder.directory(new java.io.File("/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd"));
 
@@ -339,11 +333,11 @@ public class Discovery extends AbstractVerticle
                     promise.fail("Go process failed with exit code: " + exitCode);
                 }
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                System.err.println("Error starting Go process: " + e.getMessage());
+                System.err.println("Error starting Go process: " + exception.getMessage());
 
-                promise.fail(e);
+                promise.fail(exception);
             }
         });
     }
@@ -351,7 +345,7 @@ public class Discovery extends AbstractVerticle
     private static void storeDiscoveryData(String ip, int port, JsonObject credential)
     {
         // Query to check for duplicates
-        JsonObject query = new JsonObject().put("ip", ip);
+        var query = new JsonObject().put("ip", ip);
 
         // Check for existing entry
         Operations.findOne("objects", query).onSuccess(existingEntry ->
@@ -359,25 +353,19 @@ public class Discovery extends AbstractVerticle
             if (existingEntry == null)
             {
                 // No duplicate found, insert the new data
-                JsonObject discoveryData = new JsonObject()
+                var discoveryData = new JsonObject()
                         .put("ip", ip)
                         .put("credentials", credential)
                         .put("port", port);
 
-                Operations.insert("objects", discoveryData).onSuccess(result ->
-                        System.out.println("Successfully stored discovery data: " + discoveryData.encodePrettily())
-                ).onFailure(err ->
-                        System.err.println("Failed to store discovery data: " + err.getMessage())
-                );
+                Operations.insert("objects", discoveryData).onSuccess(result -> System.out.println("Successfully stored discovery data: " + discoveryData.encodePrettily())).onFailure(err -> System.err.println("Failed to store discovery data: " + err.getMessage()));
             }
             else
             {
-                // Duplicate found, log the information
                 System.out.println("Duplicate entry found for IP: " + ip + ", Port: " + port);
             }
-        }).onFailure(err ->
-                System.err.println("Failed to check for duplicate entry: " + err.getMessage())
-        );
+
+        }).onFailure(err -> System.err.println("Failed to check for duplicate entry: " + err.getMessage()));
     }
 
 }
