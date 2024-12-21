@@ -1,4 +1,3 @@
-
 package com.motadata.services;
 
 import io.vertx.core.*;
@@ -7,7 +6,6 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.NetClient;
 import com.motadata.db.Operations;
 import com.motadata.Main;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -20,10 +18,7 @@ public class Discovery extends AbstractVerticle
         vertx.eventBus().consumer("discovery.request", this::discovery);
     }
 
-
     static Vertx vertx = Main.vertx();
-
-    private static final NetClient netClient = vertx.createNetClient();
 
     public void discovery(io.vertx.core.eventbus.Message<Object> message)
     {
@@ -31,7 +26,7 @@ public class Discovery extends AbstractVerticle
 
         var ipRange = requestBody.getString("ip");
 
-        int port = requestBody.getInteger("port");
+        var port = requestBody.getInteger("port");
 
         var credentialsIds = requestBody.getJsonArray("credentialsIds");
 
@@ -42,7 +37,6 @@ public class Discovery extends AbstractVerticle
         var futures = new ArrayList<Future>(); // Store results for each IP
 
         message.reply(new JsonObject().put("status", "Discovery started"));
-
 
         for (var ip : ips)
         {
@@ -57,10 +51,7 @@ public class Discovery extends AbstractVerticle
                     {
                         if (isOpen)
                         {
-                            var ipCredentialObject = new JsonObject()
-                                    .put("ip", ip)
-                                    .put("port", port)
-                                    .put("credentials", new JsonArray(credentialsList));
+                            var ipCredentialObject = new JsonObject().put("ip", ip).put("port", port).put("credentials", new JsonArray(credentialsList));
 
                             // Spawn Go process with IP
                             return spawnGoProcess(ipCredentialObject).map(successCredential ->
@@ -99,8 +90,10 @@ public class Discovery extends AbstractVerticle
 
             futures.add(future);
 
-            future.onComplete(AsyncResult -> {
-                if (AsyncResult.succeeded()) {
+            future.onComplete(AsyncResult ->
+            {
+                if (AsyncResult.succeeded())
+                {
                     System.out.println("Discovery result for IP " + ip + ": " + AsyncResult.result().encodePrettily());
                 }
                 else
@@ -132,7 +125,7 @@ public class Discovery extends AbstractVerticle
                     output.append(line).append("\n");
                 }
 
-                int exitCode = process.waitFor();
+                var exitCode = process.waitFor();
 
                 if (exitCode == 0)
                 {
@@ -159,7 +152,7 @@ public class Discovery extends AbstractVerticle
     {
         Promise<Boolean> promise = Promise.promise();
 
-        netClient.connect(port, ip, res ->
+        vertx.createNetClient().connect(port, ip, res ->
         {
             if (res.succeeded())
             {
@@ -271,6 +264,7 @@ public class Discovery extends AbstractVerticle
                 System.err.println("Failed to extract credentials: " + res.cause());
             }
         });
+
         return credentialsList;
     }
 
@@ -291,7 +285,7 @@ public class Discovery extends AbstractVerticle
 
                 processBuilder.directory(new java.io.File("/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd"));
 
-                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 
                 var output = new StringBuilder();
 
@@ -307,7 +301,7 @@ public class Discovery extends AbstractVerticle
                     if (line.contains("Successful login for IP"))
                     {
                         // Extract the credentials from the line (e.g., after the colon)
-                        String credentialsString = line.substring(line.indexOf("{"));
+                        var credentialsString = line.substring(line.indexOf("{"));
 
                         successfulCredential = credentialsString.trim();
                     }
@@ -315,11 +309,11 @@ public class Discovery extends AbstractVerticle
 
                 System.out.println("Output: " + output);
 
-                int exitCode = process.waitFor();
+                var exitCode = process.waitFor();
 
                 if (exitCode == 0 )
                 {
-                    JsonObject result = new JsonObject(successfulCredential);
+                    var result = new JsonObject(successfulCredential);
 
                     System.out.println("Success credentials are : " + result );
 
@@ -353,10 +347,7 @@ public class Discovery extends AbstractVerticle
             if (existingEntry == null)
             {
                 // No duplicate found, insert the new data
-                var discoveryData = new JsonObject()
-                        .put("ip", ip)
-                        .put("credentials", credential)
-                        .put("port", port);
+                var discoveryData = new JsonObject().put("ip", ip).put("credentials", credential).put("port", port);
 
                 Operations.insert("objects", discoveryData).onSuccess(result -> System.out.println("Successfully stored discovery data: " + discoveryData.encodePrettily())).onFailure(err -> System.err.println("Failed to store discovery data: " + err.getMessage()));
             }

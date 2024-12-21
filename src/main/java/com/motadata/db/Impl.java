@@ -1,13 +1,13 @@
 package com.motadata.db;
 
 import io.vertx.core.json.JsonObject;
-import io.vertx.ext.mongo.MongoClient;
+
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
 public class Impl {
 
-    MongoClient mongoClient = Initializer.getMongoClient();
+    io.vertx.ext.mongo.MongoClient mongoClient = MongoClient.getMongoClient();
 
     public void applyMigrations()
     {
@@ -21,13 +21,13 @@ public class Impl {
             var schema = new JsonObject(jsonString);
 
             // Loop through each collection in the JSON schema
-            JsonObject collections = schema.getJsonObject("collections");
+            var collections = schema.getJsonObject("collections");
 
             collections.stream().forEach(entry ->
             {
-                String collectionName = entry.getKey();
+                var collectionName = entry.getKey();
 
-                JsonObject options = new JsonObject().put("validator", ((JsonObject) entry.getValue()).getJsonObject("validator"));
+                var options = new JsonObject().put("validator", ((JsonObject) entry.getValue()).getJsonObject("validator"));
 
                 // Apply schema to collection
                 mongoClient.runCommand("collMod", new JsonObject()

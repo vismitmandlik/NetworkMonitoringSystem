@@ -3,7 +3,7 @@ package com.motadata.api;
 import com.motadata.configs.Auth;
 import com.motadata.constants.Constants;
 import io.vertx.core.AbstractVerticle;
-import io.vertx.core.json.JsonObject;
+import io.vertx.ext.auth.jwt.JWTAuth;
 import io.vertx.ext.web.Router;
 
 public class Server extends AbstractVerticle
@@ -14,7 +14,7 @@ public class Server extends AbstractVerticle
     public void start()
     {
         // Get configuration from the Vert.x context (set in Main)
-        JsonObject config = vertx.getOrCreateContext().config();
+        var config = vertx.getOrCreateContext().config();
 
         if (config == null)
         {
@@ -48,7 +48,6 @@ public class Server extends AbstractVerticle
 
     private void setupRoutes()
     {
-
         User.initRoutes(router);
 
         CredentialProfile.initRoutes(router);
@@ -56,6 +55,5 @@ public class Server extends AbstractVerticle
         Discovery.initRoutes(router);
 
         Object.initRoutes(router);
-
     }
 }

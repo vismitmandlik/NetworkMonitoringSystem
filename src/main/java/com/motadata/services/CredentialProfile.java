@@ -21,10 +21,7 @@ public class CredentialProfile
         var password = requestBody.getString("password");
 
         // Create a new credential object
-        var newCredential = new JsonObject()
-                .put("name", name)
-                .put("username", username)
-                .put("password", password);
+        var newCredential = new JsonObject().put("name", name).put("username", username).put("password", password);
 
         // Check if the name already exists in the database
         var query = new JsonObject().put("name", name);

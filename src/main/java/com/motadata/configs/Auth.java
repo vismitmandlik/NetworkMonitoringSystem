@@ -26,7 +26,7 @@ public class Auth {
     }
 
     // Getter to return the jwtAuth instance
-    public static JWTAuth getJwtAuth()
+    public static JWTAuth jwtAuth()
     {
         return JWT_AUTH;
     }

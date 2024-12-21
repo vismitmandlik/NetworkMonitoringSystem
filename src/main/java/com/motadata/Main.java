@@ -5,8 +5,7 @@ import io.vertx.config.ConfigRetriever;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Vertx;
 import com.motadata.api.Server;
-import com.motadata.db.Initializer;
-
+import com.motadata.db.MongoClient;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -21,7 +20,6 @@ public class Main
 
     public static void main(String[] args)
     {
-
         // Load configuration from config.json only once
         ConfigRetriever retriever = ConfigRetriever.create(vertx);
 
@@ -41,7 +39,7 @@ public class Main
 
             var config = configResult.result();
             
-            Initializer.initMongoClient(config);
+            MongoClient.init(config);
 
             var discoveryOptions = new DeploymentOptions().setConfig(config);
 

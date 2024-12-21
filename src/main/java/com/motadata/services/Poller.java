@@ -6,5 +6,4 @@ import io.vertx.core.Vertx;
 public class Poller
 {
     private Vertx vertx = Main.vertx();
-
 }
