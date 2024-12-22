@@ -14,7 +14,7 @@ public class Discovery
 
     public static void initRoutes(Router router)
     {
-        router.post("/api/discovery").handler(BodyHandler.create()).handler(JWTAuthHandler.create(JWT_AUTH))
+        router.post("/").handler(BodyHandler.create()).handler(JWTAuthHandler.create(JWT_AUTH))
                 .handler(context -> context.vertx().eventBus().request(Constants.DISCOVERY_VERTICLE, context.body().asJsonObject(), reply ->
                 {
                     if (reply.succeeded())

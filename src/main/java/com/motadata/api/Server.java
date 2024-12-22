@@ -47,12 +47,32 @@ public class Server extends AbstractVerticle
 
     private void setupRoutes()
     {
-        User.initRoutes(router);
+        // Creating subrouters for each resource
+        var userRouter = Router.router(vertx);
 
-        CredentialProfile.initRoutes(router);
+        var credentialRouter = Router.router(vertx);
 
-        Discovery.initRoutes(router);
+        var discoveryRouter = Router.router(vertx);
 
-        Object.initRoutes(router);
+        var objectRouter = Router.router(vertx);
+
+        // Initialize routes for each resource
+        User.initRoutes(userRouter);
+
+        CredentialProfile.initRoutes(credentialRouter);
+
+        Discovery.initRoutes(discoveryRouter);
+
+        Object.initRoutes(objectRouter);
+
+        // Mount the subrouters to the main router
+        router.mountSubRouter("/api/user", userRouter);
+
+        router.mountSubRouter("/api/credentials", credentialRouter);
+
+        router.mountSubRouter("/api/discovery", discoveryRouter);
+
+        router.mountSubRouter("/api/object", objectRouter);
+
     }
 }

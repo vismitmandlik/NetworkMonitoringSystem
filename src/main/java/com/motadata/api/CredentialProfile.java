@@ -13,11 +13,10 @@ public class CredentialProfile {
     // Method to register routes
     public static void initRoutes(Router router)
     {
-        router.post("/api/credentials").handler(BodyHandler.create()).handler(JWTAuthHandler.create(JWT_AUTH)).handler(com.motadata.services.CredentialProfile::saveCredentials);
+        router.post("/").handler(BodyHandler.create()).handler(JWTAuthHandler.create(JWT_AUTH)).handler(com.motadata.services.CredentialProfile::saveCredentials);
 
-        router.get("/api/credentials").handler(JWTAuthHandler.create(JWT_AUTH)).handler(com.motadata.services.CredentialProfile::getAllCredentials);
+        router.get("/").handler(JWTAuthHandler.create(JWT_AUTH)).handler(com.motadata.services.CredentialProfile::getAllCredentials);
 
-        // TODO - service
-        router.post("/api/credentials/:name").handler(JWTAuthHandler.create(JWT_AUTH)).handler(com.motadata.services.CredentialProfile::findCredentials);
+        router.post("/:name").handler(JWTAuthHandler.create(JWT_AUTH)).handler(com.motadata.services.CredentialProfile::findCredentials);
     }
 }
