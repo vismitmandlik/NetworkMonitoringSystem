@@ -103,7 +103,7 @@ public class Discovery extends AbstractVerticle
         }
     }
 
-    private static Future<Boolean> pingIp(String ip)
+    private Future<Boolean> pingIp(String ip)
     {
         return vertx.executeBlocking(() ->
         {
@@ -147,7 +147,7 @@ public class Discovery extends AbstractVerticle
         });
     }
 
-    private static Future<Boolean> checkPort(String ip, int port)
+    private Future<Boolean> checkPort(String ip, int port)
     {
         Promise<Boolean> promise = Promise.promise();
 
@@ -168,7 +168,7 @@ public class Discovery extends AbstractVerticle
         return promise.future();
     }
 
-    private static Future<JsonObject> retrieveCredentialById(String credentialsId)
+    private Future<JsonObject> retrieveCredentialById(String credentialsId)
     {
         // Simulate fetching a credential from the database based on the ID
         var promise = Promise.<JsonObject>promise();
@@ -215,7 +215,7 @@ public class Discovery extends AbstractVerticle
         return ipList;
     }
 
-    private static List<JsonObject> extractCredentials(JsonArray credentialsIds)
+    private List<JsonObject> extractCredentials(JsonArray credentialsIds)
     {
         var credentialsList = new ArrayList<JsonObject>();
 
@@ -267,7 +267,7 @@ public class Discovery extends AbstractVerticle
         return credentialsList;
     }
 
-    private static Future<JsonObject> spawnGoProcess(JsonObject ipCredentialObject)
+    private Future<JsonObject> spawnGoProcess(JsonObject ipCredentialObject)
     {
         return vertx.executeBlocking(promise ->
         {
@@ -331,7 +331,7 @@ public class Discovery extends AbstractVerticle
         });
     }
 
-    private static void storeDiscoveryData(String ip, int port, JsonObject credential)
+    private void storeDiscoveryData(String ip, int port, JsonObject credential)
     {
         // Query to check for duplicates
         var query = new JsonObject().put("ip", ip);
