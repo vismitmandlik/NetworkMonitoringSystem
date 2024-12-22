@@ -2,6 +2,7 @@ package com.motadata;
 
 import com.motadata.services.Discovery;
 import io.vertx.config.ConfigRetriever;
+import io.vertx.config.ConfigStoreOptions;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Vertx;
 import com.motadata.api.Server;
@@ -20,15 +21,18 @@ public class Main
 
     public static void main(String[] args)
     {
-        // Load configuration from config.json only once
-        ConfigRetriever retriever = ConfigRetriever.create(vertx);
-
         // Suppress MongoDB logs
         var mongoLogger = Logger.getLogger("org.mongodb.driver");
 
         mongoLogger.setLevel(Level.OFF);
 
-        retriever.getConfig(configResult ->
+        /* Set config.json path and load configuration from it */
+        ConfigRetriever.create(vertx, new io.vertx.config.ConfigRetrieverOptions()
+                .addStore(new ConfigStoreOptions()
+                        .setType("file")
+                        .setFormat("json")
+                        .setConfig(new io.vertx.core.json.JsonObject().put("path", "src/main/resources/config.json"))
+                )).getConfig(configResult ->
         {
             if (configResult.failed())
             {
@@ -44,7 +48,7 @@ public class Main
             var discoveryOptions = new DeploymentOptions().setConfig(config);
 
             // Deploy Discovery Verticle
-            vertx.deployVerticle(new Discovery(),discoveryOptions, response ->
+            vertx.deployVerticle(Discovery.class,discoveryOptions, response ->
             {
                 if (response.succeeded())
                 {

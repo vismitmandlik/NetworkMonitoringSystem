@@ -1,16 +1,14 @@
 package com.motadata.services;
 
 import com.motadata.configs.Auth;
+import com.motadata.constants.Constants;
 import com.motadata.db.Operations;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.auth.JWTOptions;
-import io.vertx.ext.auth.jwt.JWTAuth;
 import io.vertx.ext.web.RoutingContext;
 
-public class    User
+public class User
 {
-    private static final String USERS_COLLECTION = "users";
-
     // Register a new user
     public static void register(RoutingContext context)
     {
@@ -23,7 +21,7 @@ public class    User
         var query = new JsonObject().put("username", username);
 
         // Check if user already exists
-        Operations.findOne(USERS_COLLECTION, query).onSuccess(existingUser ->
+        Operations.findOne(Constants.USERS_COLLECTION, query).onSuccess(existingUser ->
         {
             if (existingUser != null)
             {
@@ -34,7 +32,7 @@ public class    User
                 var newUser = new JsonObject().put("username", username).put("password", password);
 
                 // Insert new user
-                Operations.insert(USERS_COLLECTION, newUser).onSuccess(id -> context.response().setStatusCode(201).end("User registered successfully.")).onFailure(err -> context.response().setStatusCode(500).end("Error registering user."));
+                Operations.insert(Constants.USERS_COLLECTION, newUser).onSuccess(id -> context.response().setStatusCode(201).end("User registered successfully.")).onFailure(err -> context.response().setStatusCode(500).end("Error registering user."));
             }
         }).onFailure(error -> context.response().setStatusCode(500).end("Error checking user existence." + error));
     }
@@ -51,7 +49,7 @@ public class    User
         var query = new JsonObject().put("username", username);
 
         // Find user by username
-        Operations.findOne(USERS_COLLECTION, query).onSuccess(user ->
+        Operations.findOne(Constants.USERS_COLLECTION, query).onSuccess(user ->
         {
             if (user != null)
             {

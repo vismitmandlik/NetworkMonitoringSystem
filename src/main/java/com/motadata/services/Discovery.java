@@ -1,9 +1,9 @@
 package com.motadata.services;
 
+import com.motadata.constants.Constants;
 import io.vertx.core.*;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
-import io.vertx.core.net.NetClient;
 import com.motadata.db.Operations;
 import com.motadata.Main;
 import java.io.BufferedReader;
@@ -14,8 +14,9 @@ import java.util.List;
 public class Discovery extends AbstractVerticle
 {
     @Override
-    public void start() {
-        vertx.eventBus().consumer("discovery.request", this::discovery);
+    public void start()
+    {
+        vertx.eventBus().consumer(Constants.DISCOVERY_VERTICLE, this::discovery);
     }
 
     static Vertx vertx = Main.vertx();
@@ -129,7 +130,7 @@ public class Discovery extends AbstractVerticle
 
                 if (exitCode == 0)
                 {
-                    return true; // Ping was successful
+                    return true;
                 }
                 else
                 {
@@ -177,7 +178,7 @@ public class Discovery extends AbstractVerticle
         var query = new JsonObject().put("_id", credentialsId);
 
         // Return null if no credential found
-        Operations.findOne("credentials", query).onSuccess(promise::complete).onFailure(err -> promise.fail(err.getMessage()));
+        Operations.findOne(Constants.CREDENTIALS_COLLECTION, query).onSuccess(promise::complete).onFailure(err -> promise.fail(err.getMessage()));
 
         return promise.future(); // This should be handled asynchronously in a real application
     }
@@ -202,7 +203,7 @@ public class Discovery extends AbstractVerticle
             var end = Integer.parseInt(endOctet);
 
             // Generate IPs from baseIp + start to baseIp + end
-            for (int i = start; i <= end; i++)
+            for (var i = start; i <= end; i++)
             {
                 ipList.add(baseIp + "." + i);
             }
@@ -225,7 +226,7 @@ public class Discovery extends AbstractVerticle
         // Using executeBlocking to handle blocking code
         vertx.executeBlocking(blockingPromise ->
         {
-            for (int i = 0; i < credentialsIds.size(); i++)
+            for (var i = 0; i < credentialsIds.size(); i++)
             {
                 var credId = credentialsIds.getString(i);
 
@@ -275,15 +276,11 @@ public class Discovery extends AbstractVerticle
             try
             {
 
-                var goExecutable = "/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd/main";
+                var goExecutable = Main.vertx().getOrCreateContext().config().getString("goExecutablePath");
 
-                var eventName = "discovery";
-
-                var processBuilder = new ProcessBuilder(goExecutable, eventName, ipCredentialObject.encode());
+                var processBuilder = new ProcessBuilder(goExecutable, Constants.DISCOVERY_EVENT, ipCredentialObject.encode()).directory(new java.io.File("/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd"));
 
                 var process = processBuilder.start();
-
-                processBuilder.directory(new java.io.File("/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd"));
 
                 var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 
@@ -342,14 +339,14 @@ public class Discovery extends AbstractVerticle
         var query = new JsonObject().put("ip", ip);
 
         // Check for existing entry
-        Operations.findOne("objects", query).onSuccess(existingEntry ->
+        Operations.findOne(Constants.OBJECTS_COLLECTION, query).onSuccess(existingEntry ->
         {
             if (existingEntry == null)
             {
                 // No duplicate found, insert the new data
                 var discoveryData = new JsonObject().put("ip", ip).put("credentials", credential).put("port", port);
 
-                Operations.insert("objects", discoveryData).onSuccess(result -> System.out.println("Successfully stored discovery data: " + discoveryData.encodePrettily())).onFailure(err -> System.err.println("Failed to store discovery data: " + err.getMessage()));
+                Operations.insert(Constants.OBJECTS_COLLECTION, discoveryData).onSuccess(result -> System.out.println("Successfully stored discovery data: " + discoveryData.encodePrettily())).onFailure(err -> System.err.println("Failed to store discovery data: " + err.getMessage()));
             }
             else
             {

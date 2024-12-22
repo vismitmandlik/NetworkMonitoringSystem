@@ -1,13 +1,107 @@
 {
   "collections": {
+    "credentials": {
+      "validator": {
+        "$jsonSchema": {
+          "bsonType": "object",
+          "required": ["name", "username", "password"],
+          "properties": {
+            "name": {
+              "bsonType": "string",
+              "description": "Name of the user"
+            },
+            "username": {
+              "bsonType": "string",
+              "description": "Username for authentication"
+            },
+            "password": {
+              "bsonType": "string",
+              "description": "Password for authentication"
+            }
+          }
+        }
+      }
+    },
+    "objects": {
+      "validator": {
+        "$jsonSchema": {
+          "bsonType": "object",
+          "required": ["ip", "credentials", "port"],
+          "properties": {
+            "ip": {
+              "bsonType": "string",
+              "description": "IP address of the device"
+            },
+            "credentials": {
+              "bsonType": "object",
+              "required": ["username", "password"],
+              "properties": {
+                "username": {
+                  "bsonType": "string",
+                  "description": "Username for authentication"
+                },
+                "password": {
+                  "bsonType": "string",
+                  "description": "Password for authentication"
+                }
+              }
+            },
+            "port": {
+              "bsonType": "int",
+              "description": "Port number for the connection"
+            }
+          }
+        }
+      }
+    },
+    "poller_results": {
+      "validator": {
+        "$jsonSchema": {
+          "bsonType": "object",
+          "required": ["deviceId", "ip", "cpuUsage", "memoryUsage", "diskUsage", "timestamp"],
+          "properties": {
+            "deviceId": {
+              "bsonType": "string",
+              "description": "Device identifier"
+            },
+            "ip": {
+              "bsonType": "string",
+              "description": "IP address of the device"
+            },
+            "cpuUsage": {
+              "bsonType": "double",
+              "description": "CPU usage percentage"
+            },
+            "memoryUsage": {
+              "bsonType": "double",
+              "description": "Memory usage percentage"
+            },
+            "diskUsage": {
+              "bsonType": "double",
+              "description": "Disk usage percentage"
+            },
+            "timestamp": {
+              "bsonType": "long",
+              "description": "Timestamp of the poll result"
+            }
+          }
+        }
+      }
+    },
     "users": {
       "validator": {
         "$jsonSchema": {
           "bsonType": "object",
           "required": ["username", "password"],
           "properties": {
-            "username": { "bsonType": "string", "description": "must be a string and is required" },
-            "password": { "bsonType": "string", "description": "must be a string and is required" }
+            "username": {
+              "bsonType": "string",
+              "description": "Username for authentication"
+            },
+            "password": {
+              "bsonType": "string",
+              "description": "Password for authentication"
+            }
           }
         }
       }

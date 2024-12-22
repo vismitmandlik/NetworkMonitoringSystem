@@ -5,23 +5,17 @@ import io.vertx.core.json.JsonObject;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
-public class Impl {
-
-    io.vertx.ext.mongo.MongoClient mongoClient = MongoClient.getMongoClient();
-
+public class Impl
+{
     public void applyMigrations()
     {
         try
         {
             // Load schema from databaseSchema.json
-            var schemaFile = "./src/main/resources/databaseSchema.json";
-
-            var jsonString = new String(Files.readAllBytes(Paths.get(schemaFile)));
-
-            var schema = new JsonObject(jsonString);
+            var jsonString = new String(Files.readAllBytes(Paths.get("./src/main/java/resources/databaseSchema.json")));
 
             // Loop through each collection in the JSON schema
-            var collections = schema.getJsonObject("collections");
+            var collections = new JsonObject(jsonString).getJsonObject("collections");
 
             collections.stream().forEach(entry ->
             {
@@ -30,7 +24,7 @@ public class Impl {
                 var options = new JsonObject().put("validator", ((JsonObject) entry.getValue()).getJsonObject("validator"));
 
                 // Apply schema to collection
-                mongoClient.runCommand("collMod", new JsonObject()
+                MongoClient.getMongoClient().runCommand("collMod", new JsonObject()
                         .put("collMod", collectionName)
                         .put("validator", options.getJsonObject("validator")), res -> {
                     if (res.succeeded())

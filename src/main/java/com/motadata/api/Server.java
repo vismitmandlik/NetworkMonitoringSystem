@@ -3,7 +3,6 @@ package com.motadata.api;
 import com.motadata.configs.Auth;
 import com.motadata.constants.Constants;
 import io.vertx.core.AbstractVerticle;
-import io.vertx.ext.auth.jwt.JWTAuth;
 import io.vertx.ext.web.Router;
 
 public class Server extends AbstractVerticle
@@ -27,11 +26,9 @@ public class Server extends AbstractVerticle
 
         Auth.initialize(vertx,config);
 
-        var port = config.getInteger("http_port", Constants.HTTP_PORT);
-
         router = Router.router(vertx);
 
-        setupRoutes();
+        var port = config.getInteger("http_port", Constants.HTTP_PORT);
 
         vertx.createHttpServer().requestHandler(router).listen(port, response ->
         {
@@ -44,6 +41,8 @@ public class Server extends AbstractVerticle
                 System.err.println("Failed to start server: " + response.cause());
             }
         });
+
+        setupRoutes();
     }
 
     private void setupRoutes()

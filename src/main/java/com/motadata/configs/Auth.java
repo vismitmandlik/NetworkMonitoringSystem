@@ -11,7 +11,6 @@ public class Auth {
 
     private static JWTAuth JWT_AUTH;
 
-    // Static block to initialize JWTAuth when it's needed
     public static void initialize(Vertx vertx, JsonObject config)
     {
         if (JWT_AUTH == null)

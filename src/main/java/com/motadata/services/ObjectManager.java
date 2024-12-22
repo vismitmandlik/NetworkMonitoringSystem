@@ -1,10 +1,10 @@
 package com.motadata.services;
 
 import com.motadata.Main;
+import com.motadata.constants.Constants;
 import com.motadata.db.Operations;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
-import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
@@ -15,9 +15,6 @@ import java.util.List;
 
 public class ObjectManager
 {
-
-    static Vertx vertx = Main.vertx();
-
     public static void provisionDevices(RoutingContext context)
     {
         var requestBody = context.body().asJsonObject();
@@ -56,18 +53,18 @@ public class ObjectManager
     {
         System.out.println("Polling task started for device " + device.getString("_id") + " with interval " + pollInterval + " seconds.");
 
-        vertx.setPeriodic(pollInterval * 1000L, timerId -> pollDevice(device, event));
+        Main.vertx().setPeriodic(pollInterval * 1000L, timerId -> pollDevice(device, event));
     }
 
     private static void pollDevice(JsonObject device, String event)
     {
-        vertx.executeBlocking(() ->
+        Main.vertx().executeBlocking(() ->
         {
             try
             {
                 var devicesJsonString = new JsonArray().add(device).encode();
 
-                var goExecutable = "/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd/main";
+                var goExecutable = Main.vertx().getOrCreateContext().config().getString("goExecutablePath");
 
                 var process = new ProcessBuilder(goExecutable, event, devicesJsonString).start();
 
@@ -117,12 +114,11 @@ public class ObjectManager
     {
         var promise = Promise.<List<JsonObject>>promise();
 
-        Operations.findAll("objects", new JsonObject().put("_id", new JsonObject().put("$in", deviceIds))).onSuccess(devices ->
+        Operations.findAll(Constants.OBJECTS_COLLECTION, new JsonObject().put("_id", new JsonObject().put("$in", deviceIds))).onSuccess(devices ->
         {
             if (devices.isEmpty())
             {
                 promise.fail("No devices found with the provided IDs");
-
             }
             else
             {
@@ -145,7 +141,7 @@ public class ObjectManager
             {
                 result.put("timestamp", timestamp);
 
-                Operations.insert("poller_results", result).onSuccess(res -> System.out.println("Poller result stored in database: " + result.encodePrettily())).onFailure(err -> System.err.println("Insert failed: " + err.getMessage()));
+                Operations.insert(Constants.POLLER_RESULTS_COLLECTION, result).onSuccess(res -> System.out.println("Poller result stored in database: " + result.encodePrettily())).onFailure(err -> System.err.println("Insert failed: " + err.getMessage()));
             }
         });
     }
@@ -159,6 +155,7 @@ public class ObjectManager
             var deviceId = result.getString("deviceId");
 
             if (deviceId == null || deviceId.isEmpty())
+
             {
                 System.err.println("DeviceId is null or empty in result: " + result);
 
@@ -194,7 +191,7 @@ public class ObjectManager
 
     private static String errorResponse(String message)
     {
-        return new JsonObject().put("error", message).toBuffer().toString();
+        return new JsonObject().put("error", message).toString();
     }
 
     private static String successResponse()

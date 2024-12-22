@@ -1,9 +1,0 @@
-{
-  "connection_string": "mongodb://localhost:27017",
-
-  "db_name": "nms_db",
-
-  "port": 8080,
-
-  "polling_interval": 60
-}
