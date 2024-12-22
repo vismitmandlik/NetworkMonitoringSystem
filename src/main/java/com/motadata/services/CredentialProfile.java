@@ -61,6 +61,12 @@ public class CredentialProfile
     {
         var name = context.request().getParam("name");
 
+        if (name == null || name.isEmpty())
+        {
+            context.response().setStatusCode(400).end("Invalid request: 'name' is missing");
+
+            return;
+        }
         var query = new JsonObject().put("name", name);
 
         // Find credentials in the database

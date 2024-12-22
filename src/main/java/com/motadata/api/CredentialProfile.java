@@ -18,6 +18,6 @@ public class CredentialProfile {
         router.get("/api/credentials").handler(JWTAuthHandler.create(JWT_AUTH)).handler(com.motadata.services.CredentialProfile::getAllCredentials);
 
         // TODO - service
-        router.post("/api/credentials/:id").handler(JWTAuthHandler.create(JWT_AUTH)).handler(com.motadata.services.CredentialProfile::findCredentials);
+        router.post("/api/credentials/:name").handler(JWTAuthHandler.create(JWT_AUTH)).handler(com.motadata.services.CredentialProfile::findCredentials);
     }
 }
