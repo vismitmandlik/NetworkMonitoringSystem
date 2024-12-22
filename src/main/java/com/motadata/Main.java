@@ -47,29 +47,31 @@ public class Main
 
             var discoveryOptions = new DeploymentOptions().setConfig(config);
 
-            // Deploy Discovery Verticle
-            vertx.deployVerticle(Discovery.class,discoveryOptions, response ->
-            {
-                if (response.succeeded())
-                {
-                    System.out.println("Successfully deployed Discovery Verticle");
-                }
-                else
-                {
-                    System.err.println("Failed to deploy Discovery Verticle: " + response.cause());
-                }
-            });
+
 
             // Deploy Server Verticle
-            vertx.deployVerticle(Server.class.getName(),discoveryOptions, response ->
+            vertx.deployVerticle(Server.class.getName(),discoveryOptions, serverResponse ->
             {
-                if (response.succeeded())
+                if (serverResponse.succeeded())
                 {
                     System.out.println("Successfully deployed Server Verticle");
+
+                    // Deploy Discovery Verticle
+                    vertx.deployVerticle(Discovery.class.getName(),discoveryOptions, discoveryResponse ->
+                    {
+                        if (discoveryResponse.succeeded())
+                        {
+                            System.out.println("Successfully deployed Discovery Verticle");
+                        }
+                        else
+                        {
+                            System.err.println("Failed to deploy Discovery Verticle: " + discoveryResponse.cause());
+                        }
+                    });
                 }
                 else
                 {
-                    System.err.println("Failed to deploy Server Verticle: " + response.cause());
+                    System.err.println("Failed to deploy Server Verticle: " + serverResponse.cause());
                 }
             });
         });

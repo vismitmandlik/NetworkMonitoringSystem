@@ -57,8 +57,6 @@ public class Discovery extends AbstractVerticle
                             // Spawn Go process with IP
                             return spawnGoProcess(ipCredentialObject).map(successCredential ->
                             {
-                                System.out.println("Success credentials : " + successCredential);
-
                                 if (successCredential != null)
                                 {
                                     // If SSH succeeded and returned a credential

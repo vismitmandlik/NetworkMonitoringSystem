@@ -10,7 +10,7 @@ public class Constants
 
     public static final String CREDENTIALS_COLLECTION = "credentials";
 
-    public static final String DISCOVERY_EVENT = "discoveryEvent";
+    public static final String DISCOVERY_EVENT = "discovery";
 
     public static final String USERS_COLLECTION = "users";
 
