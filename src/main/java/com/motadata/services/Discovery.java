@@ -63,12 +63,7 @@ public class Discovery extends AbstractVerticle
                                     // If SSH succeeded and returned a credential
                                     result.put("status", "success");
 
-                                    // Generate a UUID after passing all checks
-                                    String generatedUUID = UUID.randomUUID().toString();
-
-                                    result.put("uuid", generatedUUID); // Add UUID to the result
-
-                                    storeDiscoveryData(ip, port, successCredential, generatedUUID);
+                                    storeDiscoveryData(ip, port, successCredential);
                                 }
                                 else
                                 {
@@ -337,7 +332,7 @@ public class Discovery extends AbstractVerticle
         });
     }
 
-    private void storeDiscoveryData(String ip, int port, JsonObject credential, String generatedUUID)
+    private void storeDiscoveryData(String ip, int port, JsonObject credential)
     {
         // Query to check for duplicates
         var query = new JsonObject().put("ip", ip);
@@ -348,7 +343,7 @@ public class Discovery extends AbstractVerticle
             if (existingEntry == null)
             {
                 // No duplicate found, insert the new data
-                var discoveryData = new JsonObject().put("uuid", generatedUUID).put("ip", ip).put("credentials", credential).put("port", port);
+                var discoveryData = new JsonObject().put("ip", ip).put("credentials", credential).put("port", port);
 
                 Operations.insert(Constants.OBJECTS_COLLECTION, discoveryData).onSuccess(result -> System.out.println("Successfully stored discovery data: " + discoveryData.encodePrettily())).onFailure(err -> System.err.println("Failed to store discovery data: " + err.getMessage()));
             }

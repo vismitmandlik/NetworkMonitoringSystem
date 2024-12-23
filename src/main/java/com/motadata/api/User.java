@@ -3,8 +3,8 @@ package com.motadata.api;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
 
-public class User {
-
+public class User
+{
     // Initialize routes and register them in the Router
     public static void initRoutes(Router router)
     {
