@@ -57,21 +57,24 @@ public class ObjectManager
 
     private static void pollDevice(JsonObject device, String event)
     {
-        Main.vertx().executeBlocking(() ->
+        Main.vertx().executeBlocking(promise ->
         {
+            Process process = null;
+
             try
             {
                 var devicesJsonString = new JsonArray().add(device).encode();
 
                 var goExecutable = Main.vertx().getOrCreateContext().config().getString("goExecutablePath");
 
-                var process = new ProcessBuilder(goExecutable, event, devicesJsonString).start();
+                process = new ProcessBuilder(goExecutable, event, devicesJsonString).start();
 
                 var outputLines = new JsonArray();
 
-                try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream())))
+                // Use try-with-resources to handle BufferedReader
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream())))
                 {
-                    var line = "";
+                    String line;
 
                     while ((line = reader.readLine()) != null)
                     {
@@ -93,13 +96,24 @@ public class ObjectManager
                     System.out.println("Polling failed for device " + device.getString("_id"));
                 }
             }
+
             catch (Exception exception)
             {
                 exception.printStackTrace();
             }
 
-            return "Poll completed";
+            finally
+            {
+                // Ensure the process is destroyed if it's still running
+                if (process != null && process.isAlive())
+                {
+                    process.destroy();
 
+                    System.out.println("Polling process for device " + device.getString("_id") + " was destroyed.");
+                }
+
+                promise.complete("Poll completed");
+            }
         }, asyncResult ->
         {
             if (asyncResult.succeeded())
@@ -108,6 +122,7 @@ public class ObjectManager
             }
         });
     }
+
 
     public static Future<List<JsonObject>> fetchDeviceDetails(JsonArray deviceIds)
     {

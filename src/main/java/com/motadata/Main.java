@@ -49,8 +49,6 @@ public class Main
 
             var discoveryOptions = new DeploymentOptions().setConfig(config);
 
-
-
             // Deploy Server Verticle
             vertx.deployVerticle(Server.class.getName(),discoveryOptions, serverResponse ->
             {

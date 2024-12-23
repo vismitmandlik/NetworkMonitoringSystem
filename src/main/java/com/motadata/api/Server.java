@@ -4,6 +4,8 @@ import com.motadata.configs.Auth;
 import com.motadata.constants.Constants;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.ext.web.Router;
+import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.JWTAuthHandler;
 
 public class Server extends AbstractVerticle
 {
@@ -47,7 +49,10 @@ public class Server extends AbstractVerticle
 
     private void setupRoutes()
     {
-        // Creating subrouters for each resource
+        // Apply BodyHandler and JWTAuthHandler globally to all routes
+        router.route().handler(BodyHandler.create()).handler(JWTAuthHandler.create(Auth.jwtAuth()));
+
+        // Creating sub-routers for each resource
         var userRouter = Router.router(vertx);
 
         var credentialRouter = Router.router(vertx);
@@ -65,14 +70,13 @@ public class Server extends AbstractVerticle
 
         Object.initRoutes(objectRouter);
 
-        // Mount the subrouters to the main router
-        router.mountSubRouter("/api/user", userRouter);
+        router.route("/api/user/*").subRouter(userRouter);
 
-        router.mountSubRouter("/api/credentials", credentialRouter);
+        router.route("/api/credentials/*").subRouter(credentialRouter);
 
-        router.mountSubRouter("/api/discovery", discoveryRouter);
+        router.route("/api/discovery/*").subRouter(discoveryRouter);
 
-        router.mountSubRouter("/api/object", objectRouter);
+        router.route("/api/object/*").subRouter(objectRouter);
 
     }
 }

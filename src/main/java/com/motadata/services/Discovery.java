@@ -7,6 +7,7 @@ import io.vertx.core.json.JsonObject;
 import com.motadata.db.Operations;
 import com.motadata.Main;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
@@ -271,16 +272,19 @@ public class Discovery extends AbstractVerticle
     {
         return vertx.executeBlocking(promise ->
         {
+            Process process = null;
+
+            BufferedReader reader = null;
+
             try
             {
-
                 var goExecutable = Main.vertx().getOrCreateContext().config().getString("goExecutablePath");
 
                 var processBuilder = new ProcessBuilder(goExecutable, Constants.DISCOVERY_EVENT, ipCredentialObject.encode()).directory(new java.io.File("/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd"));
 
-                var process = processBuilder.start();
+                process = processBuilder.start();
 
-                var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 
                 var output = new StringBuilder();
 
@@ -328,6 +332,27 @@ public class Discovery extends AbstractVerticle
                 System.err.println("Error starting Go process: " + exception.getMessage());
 
                 promise.fail(exception);
+            }
+
+            finally
+            {
+                // Ensure that we properly kill the process and close resources
+                if (reader != null)
+                {
+                    try
+                    {
+                        reader.close();
+                    }
+                    catch (IOException e)
+                    {
+                        System.err.println("Failed to close reader: " + e.getMessage());
+                    }
+                }
+
+                if (process != null)
+                {
+                    process.destroy(); // Kill the process
+                }
             }
         });
     }
