@@ -7,12 +7,14 @@ import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Vertx;
 import com.motadata.api.Server;
 import com.motadata.db.MongoClient;
+import io.vertx.core.VertxOptions;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class Main
 {
-    static Vertx vertx = Vertx.vertx();
+    private static Vertx vertx = Vertx.vertx(new VertxOptions().setWorkerPoolSize(Runtime.getRuntime().availableProcessors() * 2));
 
     public static Vertx vertx()
     {

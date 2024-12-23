@@ -8,7 +8,6 @@ import io.vertx.core.Promise;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.List;

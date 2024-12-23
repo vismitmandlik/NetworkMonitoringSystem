@@ -10,7 +10,6 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 public class Discovery extends AbstractVerticle
 {
@@ -323,6 +322,7 @@ public class Discovery extends AbstractVerticle
                     promise.fail("Go process failed with exit code: " + exitCode);
                 }
             }
+
             catch (Exception exception)
             {
                 System.err.println("Error starting Go process: " + exception.getMessage());
