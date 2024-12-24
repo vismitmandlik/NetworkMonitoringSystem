@@ -16,6 +16,7 @@ public class MongoClient
 
         var dbName = config.getString("db_name", Constants.DB_NAME);
 
+        System.out.println("Connecting to Mongodb...");
         MONGO_CLIENT = io.vertx.ext.mongo.MongoClient.createShared(Main.vertx(), new JsonObject().put("connection_string", connectionString).put("db_name", dbName));
 
         // Create a promise to track the success or failure of the connection
@@ -25,11 +26,13 @@ public class MongoClient
         {
             if (response.succeeded())
             {
-                System.out.println("Connected to MongoDB  " );
+                promise.complete();
             }
             else
             {
                 System.err.println("Failed to connect: " + response.cause().getMessage());
+
+                promise.fail(response.cause());
             }
         });
 
