@@ -1,7 +1,5 @@
 package com.motadata.api;
 
-import com.motadata.configs.Auth;
-import io.vertx.ext.auth.jwt.JWTAuth;
 import io.vertx.ext.web.Router;
 
 public class CredentialProfile
