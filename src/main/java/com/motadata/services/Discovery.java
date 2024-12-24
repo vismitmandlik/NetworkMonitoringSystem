@@ -1,11 +1,13 @@
 package com.motadata.services;
 
 import com.motadata.constants.Constants;
+import com.motadata.db.Operations;
+import com.motadata.Main;
+
 import io.vertx.core.*;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
-import com.motadata.db.Operations;
-import com.motadata.Main;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -131,6 +133,7 @@ public class Discovery extends AbstractVerticle
                 {
                     return true;
                 }
+
                 else
                 {
                     System.err.println("Ping failed for " + ip + ":\n" + output);
@@ -140,7 +143,6 @@ public class Discovery extends AbstractVerticle
             }
             catch (Exception exception)
             {
-                // Handle exception
                 exception.printStackTrace();
 
                 return false; // Return false on exception
@@ -158,6 +160,7 @@ public class Discovery extends AbstractVerticle
             {
                 promise.complete(true);
             }
+
             else
             {
                 System.err.println("Failed to connect to " + ip + ":" + port + " - " + res.cause().getMessage());
@@ -222,7 +225,7 @@ public class Discovery extends AbstractVerticle
 
         var futures = new ArrayList<Future>();
 
-        // Using executeBlocking to handle blocking code
+        // Using executeBlocking to handle blocking database operations
         vertx.executeBlocking(blockingPromise ->
         {
             for (var i = 0; i < credentialsIds.size(); i++)

@@ -18,10 +18,10 @@ public class MongoClient
 
         System.out.println("Connecting to Mongodb...");
 
-        /*Set minPoolSize = No. of Verticles and maxPoolSize = 100 {default} */
+        /* Set minPoolSize = No. of Verticles and maxPoolSize = 100 {default} */
         MONGO_CLIENT = io.vertx.ext.mongo.MongoClient.createShared(Main.vertx(), new JsonObject().put("connection_string", connectionString).put("db_name", dbName).put("minPoolSize", 3));
 
-        // Create a promise to track the success or failure of the connection
+        /* Create a promise to track the success or failure of the connection */
         Promise<Void> promise = Promise.promise();
 
         MONGO_CLIENT.runCommand("ping", new JsonObject().put("ping", 1), response ->
