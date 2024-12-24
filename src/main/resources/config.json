@@ -9,5 +9,5 @@
 
   "polling_interval": 60,
 
-  "goExecutablePath": "/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd/main"
+  "goExecutablePath": "/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd/main",
 }

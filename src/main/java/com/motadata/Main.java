@@ -48,10 +48,10 @@ public class Main
             {
                 System.out.println("Successfully connected to MongoDB");
 
-                var discoveryOptions = new DeploymentOptions().setConfig(config);
+                var serverOptions = new DeploymentOptions().setConfig(config).setInstances(Runtime.getRuntime().availableProcessors() * 2);
 
                 // Deploy Server Verticle first
-                return deployVerticle(Server.class.getName(), discoveryOptions);
+                return deployVerticle(Server.class.getName(), serverOptions);
 
             }).compose(serverResponse ->
             {
