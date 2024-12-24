@@ -12,7 +12,7 @@ import java.util.logging.Logger;
 
 public class Main
 {
-    private static Vertx vertx = Vertx.vertx(new VertxOptions().setWorkerPoolSize(Runtime.getRuntime().availableProcessors() * 2));
+    private static final Vertx vertx = Vertx.vertx(new VertxOptions().setWorkerPoolSize(Runtime.getRuntime().availableProcessors() * 2));
 
     public static Vertx vertx()
     {
@@ -57,7 +57,7 @@ public class Main
             {
                 System.out.println("Successfully deployed Server Verticle");
 
-                var discoveryOptions = new DeploymentOptions().setConfig(config);
+                var discoveryOptions = new DeploymentOptions().setConfig(config).setInstances(Runtime.getRuntime().availableProcessors() * 2);
 
                 // Deploy Discovery Verticle
                 return deployVerticle(Discovery.class.getName(), discoveryOptions);
@@ -75,9 +75,7 @@ public class Main
         });
     }
 
-    /**
-     * Deploys a Verticle and returns a Future to track success or failure.
-     */
+    /* Deploys a Verticle and returns a Future to track success or failure. */
     public static Future<Void> deployVerticle(String verticleName, DeploymentOptions options)
     {
         Promise<Void> promise = Promise.promise();

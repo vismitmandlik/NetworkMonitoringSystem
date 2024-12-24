@@ -19,7 +19,7 @@ public class Discovery extends AbstractVerticle
     @Override
     public void start()
     {
-        vertx.eventBus().consumer(Constants.DISCOVERY_VERTICLE, this::discovery);
+        vertx.eventBus().localConsumer(Constants.DISCOVERY_VERTICLE, this::discovery);
     }
 
     static Vertx vertx = Main.vertx();
@@ -74,6 +74,7 @@ public class Discovery extends AbstractVerticle
                                 return result;
                             });
                         }
+
                         else
                         {
                             result.put("status", "failed").put("reason", "Port not open");
@@ -82,6 +83,7 @@ public class Discovery extends AbstractVerticle
                         }
                     });
                 }
+
                 else
                 {
                     result.put("status", "failed").put("reason", "IP not reachable");
@@ -262,6 +264,7 @@ public class Discovery extends AbstractVerticle
             {
                 System.out.println("Successfully extracted credentials");
             }
+
             else
             {
                 System.err.println("Failed to extract credentials: " + res.cause());
