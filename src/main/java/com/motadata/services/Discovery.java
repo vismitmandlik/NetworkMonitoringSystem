@@ -38,7 +38,7 @@ public class Discovery extends AbstractVerticle
 
         var credentialsList = extractCredentials(credentialsIds);
 
-        var futures = new ArrayList<Future>(); // Store results for each IP
+//        var futures = new ArrayList<Future<JsonObject>>(); // Store results for each IP
 
         message.reply(new JsonObject().put("status", "Discovery started"));
 
@@ -92,7 +92,7 @@ public class Discovery extends AbstractVerticle
                 }
             }).onFailure(err -> result.put("status", "failed").put("reason", err.getMessage()));
 
-            futures.add(future);
+//            futures.add(future);
 
             future.onComplete(AsyncResult ->
             {
@@ -225,7 +225,7 @@ public class Discovery extends AbstractVerticle
     {
         var credentialsList = new ArrayList<JsonObject>();
 
-        var futures = new ArrayList<Future>();
+        var futures = new ArrayList<Future<JsonObject>>();
 
         // Using executeBlocking to handle blocking database operations
         vertx.executeBlocking(blockingPromise ->
@@ -247,7 +247,7 @@ public class Discovery extends AbstractVerticle
                 });
             }
 
-            CompositeFuture.all(futures).onComplete(res ->
+            Future.all(futures).onComplete(res ->
             {
                 if (res.succeeded())
                 {
