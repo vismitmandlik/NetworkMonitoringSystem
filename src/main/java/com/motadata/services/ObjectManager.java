@@ -14,6 +14,8 @@ import java.util.List;
 
 public class ObjectManager
 {
+    private static long TIMER_ID = -1;
+    
     public static void provisionDevices(RoutingContext context)
     {
         var requestBody = context.body().asJsonObject();
@@ -33,9 +35,14 @@ public class ObjectManager
 
         fetchDeviceDetails(deviceIds).onSuccess(devices ->
         {
-            for (JsonObject device : devices)
+            // Start polling task for the first time, if not already started
+            if (TIMER_ID == -1)
             {
-                startPollingTask(device, event, pollInterval);
+                startPollingTask(devices, event, pollInterval);
+            }
+            else
+            {
+                System.out.println("Polling is already active.");
             }
 
             context.response().setStatusCode(200).end(successResponse());
@@ -48,11 +55,17 @@ public class ObjectManager
         return requestBody != null && requestBody.containsKey("objectIds") && requestBody.containsKey("pollInterval");
     }
 
-    private static void startPollingTask(JsonObject device, String event, int pollInterval)
+    private static void startPollingTask(List<JsonObject> devices, String event, int pollInterval)
     {
-        System.out.println("Polling task started for device " + device.getString("_id") + " with interval " + pollInterval + " seconds.");
+        System.out.println("Polling task started for device with interval " + pollInterval + " seconds.");
 
-        Main.vertx().setPeriodic(pollInterval * 1000L, timerId -> pollDevice(device, event));
+        TIMER_ID = Main.vertx().setPeriodic(pollInterval * 1000L, timerId ->
+        {
+            for (  JsonObject device : devices)
+            {
+                pollDevice(device, event);
+            }
+        });
     }
 
     private static void pollDevice(JsonObject device, String event)
@@ -122,7 +135,6 @@ public class ObjectManager
             }
         });
     }
-
 
     public static Future<List<JsonObject>> fetchDeviceDetails(JsonArray deviceIds)
     {
