@@ -1,9 +1,7 @@
 package com.motadata.api;
 
-import com.motadata.configs.Auth;
 import com.motadata.constants.Constants;
 import io.vertx.core.json.JsonObject;
-import io.vertx.ext.auth.jwt.JWTAuth;
 import io.vertx.ext.web.Router;
 
 public class Discovery
