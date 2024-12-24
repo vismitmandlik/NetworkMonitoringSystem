@@ -13,8 +13,8 @@ public class Object
 
     public static void initRoutes(Router router)
     {
-        router.post("/provision").handler(BodyHandler.create()).handler(JWTAuthHandler.create(JWT_AUTH)).handler(ObjectManager::provisionDevices);
+        router.post("/provision").handler(ObjectManager::provisionDevices);
 
-        router.post("/poll").handler(BodyHandler.create()).handler(JWTAuthHandler.create(JWT_AUTH)).handler(ObjectManager::provisionDevices);
+        router.post("/poll").handler(ObjectManager::provisionDevices);
     }
 }
