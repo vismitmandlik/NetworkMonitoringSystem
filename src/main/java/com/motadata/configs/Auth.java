@@ -11,6 +11,7 @@ public class Auth {
 
     private static JWTAuth JWT_AUTH;
 
+    /* takes jwt configs from config.json and creates token using it */
     public static void initialize(Vertx vertx, JsonObject config)
     {
         if (JWT_AUTH == null)

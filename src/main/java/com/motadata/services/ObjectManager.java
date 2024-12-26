@@ -8,14 +8,26 @@ import io.vertx.core.Promise;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
+
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static com.motadata.services.Poller.pollDevice;
 
 public class ObjectManager
 {
     private static long TIMER_ID = -1;
-    
+
+    private static final int BATCH_SIZE = 25;
+
+    private static final Queue<JsonObject> deviceQueue = new ConcurrentLinkedQueue<>();
+
+    // Fixed thread pool with 4 threads for batch processing
+    private static final ExecutorService batchThreadPool = Executors.newFixedThreadPool(4);
+
     public static void provisionDevices(RoutingContext context)
     {
         var requestBody = context.body().asJsonObject();
@@ -35,10 +47,28 @@ public class ObjectManager
 
         fetchDeviceDetails(deviceIds).onSuccess(devices ->
         {
+            // Filter devices based on IP reachability and open port
+            var reachableDevices = new JsonArray();
+
+            for (var device : devices)
+            {
+                var ip = device.getString("ip");
+
+                var port = device.getInteger("port");
+
+                checkDeviceAvailability(ip, port).onSuccess(isAvailable ->
+                {
+                    if (isAvailable)
+                    {
+                        deviceQueue.add(device);
+                    }
+                }).onFailure(err -> System.err.println("Device " + ip + " not available: " + err.getMessage()));
+            }
+
             // Start polling task for the first time, if not already started
             if (TIMER_ID == -1)
             {
-                startPollingTask(devices, event, pollInterval);
+                startPollingTask( event, pollInterval);
             }
             else
             {
@@ -55,20 +85,27 @@ public class ObjectManager
         return requestBody != null && requestBody.containsKey("objectIds") && requestBody.containsKey("pollInterval");
     }
 
-    private static void startPollingTask(List<JsonObject> devices, String event, int pollInterval)
+    private static void startPollingTask(String event, int pollInterval)
     {
         System.out.println("Polling task started for device with interval " + pollInterval + " seconds.");
 
         TIMER_ID = Main.vertx().setPeriodic(pollInterval * 1000L, timerId ->
         {
-            for (  JsonObject device : devices)
+            if (!deviceQueue.isEmpty())
             {
-                pollDevice(device, event);
+                var batch = new JsonArray();
+
+                for (int i = 0; i < BATCH_SIZE && !deviceQueue.isEmpty(); i++)
+                {
+                    batch.add(deviceQueue.poll());  // Add device to batch from the queue
+                }
+
+                // Use a fixed thread pool to poll devices concurrently
+                batchThreadPool.submit(() -> pollDevice(batch, event));
+
             }
         });
     }
-
-
 
     public static Future<List<JsonObject>> fetchDeviceDetails(JsonArray deviceIds)
     {
@@ -104,6 +141,70 @@ public class ObjectManager
                 Operations.insert(Constants.POLLER_RESULTS_COLLECTION, result).onSuccess(res -> System.out.println("Poller result stored in database: " + result.encodePrettily())).onFailure(err -> System.err.println("Insert failed: " + err.getMessage()));
             }
         });
+    }
+
+    // Checks if the device IP is reachable and if the port is open
+    private static Future<Boolean> checkDeviceAvailability(String ip, int port)
+    {
+        return pingIp(ip).compose(isReachable ->
+        {
+            if (isReachable)
+            {
+                return checkPort(ip, port);
+            }
+
+            else
+            {
+                return Future.failedFuture("Device is not reachable");
+            }
+        });
+    }
+
+    private static Future<Boolean> pingIp(String ip)
+    {
+        return Main.vertx().executeBlocking(promise ->
+        {
+            try
+            {
+                var processBuilder = new ProcessBuilder("ping", "-c", "1", ip);
+
+                var process = processBuilder.start();
+
+                var exitCode = process.waitFor();
+
+                if (exitCode == 0)
+                {
+                    promise.complete(true);
+                }
+                else
+                {
+                    promise.complete(false);
+                }
+            }
+            catch (Exception e)
+            {
+                promise.fail("Ping failed: " + e.getMessage());
+            }
+        });
+    }
+
+    private static Future<Boolean> checkPort(String ip, int port)
+    {
+        var promise = Promise.<Boolean>promise();
+
+        Main.vertx().createNetClient().connect(port, ip, res ->
+        {
+            if (res.succeeded())
+            {
+                promise.complete(true);
+            }
+            else
+            {
+                promise.fail("Failed to connect to port " + port + " on IP " + ip);
+            }
+        });
+
+        return promise.future();
     }
 
     private static JsonObject parsePollerResult(String pollerResult)
@@ -147,6 +248,29 @@ public class ObjectManager
         {
             return 0.0;
         }
+    }
+
+    private static List<JsonArray> splitIntoBatches(JsonArray devices)
+    {
+        List<JsonArray> batches = new java.util.ArrayList<>();
+
+        int totalDevices = devices.size();
+
+        for (int i = 0; i < totalDevices; i += BATCH_SIZE)
+        {
+            int end = Math.min(i + 25, totalDevices);
+
+            JsonArray batch = devices.getJsonArray(i);
+
+            // Add devices to the batch
+            for (int j = i; j < end; j++) {
+                batch.add(devices.getJsonObject(j));  // Add device to the batch
+            }
+
+            batches.add(batch);
+        }
+
+        return batches;
     }
 
     private static String errorResponse(String message)

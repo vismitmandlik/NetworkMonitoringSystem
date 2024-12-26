@@ -50,7 +50,7 @@ public class Server extends AbstractVerticle
     private void setupRoutes()
     {
         // Apply BodyHandler and JWTAuthHandler globally to all routes
-        router.route().handler(BodyHandler.create()).handler(JWTAuthHandler.create(Auth.jwtAuth()));
+        router.route().handler(BodyHandler.create());
 
         // Creating sub-routers for each resource
         var userRouter = Router.router(vertx);
@@ -61,6 +61,16 @@ public class Server extends AbstractVerticle
 
         var objectRouter = Router.router(vertx);
 
+        router.route("/api/user/*").subRouter(userRouter);
+
+        router.route().handler(JWTAuthHandler.create(Auth.jwtAuth()));
+
+        router.route("/api/credentials/*").subRouter(credentialRouter);
+
+        router.route("/api/discovery/*").subRouter(discoveryRouter);
+
+        router.route("/api/object/*").subRouter(objectRouter);
+
         // Initialize routes for each resource
         User.initRoutes(userRouter);
 
@@ -69,14 +79,6 @@ public class Server extends AbstractVerticle
         Discovery.initRoutes(discoveryRouter);
 
         Object.initRoutes(objectRouter);
-
-        router.route("/api/user/*").subRouter(userRouter);
-
-        router.route("/api/credentials/*").subRouter(credentialRouter);
-
-        router.route("/api/discovery/*").subRouter(discoveryRouter);
-
-        router.route("/api/object/*").subRouter(objectRouter);
 
     }
 }

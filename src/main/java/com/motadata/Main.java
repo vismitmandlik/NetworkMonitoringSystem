@@ -21,7 +21,7 @@ public class Main
 
     public static void main(String[] args)
     {
-        // Suppress MongoDB logs
+        /* Suppress MongoDB logs warning */
         var mongoLogger = Logger.getLogger("org.mongodb.driver");
 
         mongoLogger.setLevel(Level.OFF);
@@ -43,6 +43,8 @@ public class Main
 
             var config = configResult.result();
 
+            System.out.println("Configuration: " + config.encodePrettily());
+
             // Initialize MongoDB client and check if the connection is successful
             MongoClient.init(config).compose(initResult ->
             {
@@ -62,17 +64,14 @@ public class Main
                 // Deploy Discovery Verticle
                 return deployVerticle(Discovery.class.getName(), discoveryOptions);
 
-            }).onSuccess(discoveryResponse ->
-            {
-                System.out.println("Successfully deployed Discovery Verticle");
-
-            }).onFailure(err ->
+            }).onSuccess(discoveryResponse -> System.out.println("Successfully deployed Discovery Verticle")).onFailure(err ->
             {
                 System.err.println("Failed to deploy Verticle: " + err.getMessage());
 
                 vertx.close();
             });
         });
+
     }
 
     /* Deploys a Verticle and returns a Future to track success or failure. */

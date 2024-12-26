@@ -2,7 +2,6 @@ package com.motadata.services;
 
 import com.motadata.constants.Constants;
 import com.motadata.db.Operations;
-import com.motadata.Main;
 
 import io.vertx.core.*;
 import io.vertx.core.json.JsonArray;
@@ -22,8 +21,6 @@ public class Discovery extends AbstractVerticle
         vertx.eventBus().localConsumer(Constants.DISCOVERY_VERTICLE, this::discovery);
     }
 
-    static Vertx vertx = Main.vertx();
-
     public void discovery(io.vertx.core.eventbus.Message<Object> message)
     {
         var requestBody = (JsonObject) message.body();
@@ -37,8 +34,6 @@ public class Discovery extends AbstractVerticle
         var ips = extractIpAddresses(ipRange);
 
         var credentialsList = extractCredentials(credentialsIds);
-
-//        var futures = new ArrayList<Future<JsonObject>>(); // Store results for each IP
 
         message.reply(new JsonObject().put("status", "Discovery started"));
 
@@ -67,10 +62,12 @@ public class Discovery extends AbstractVerticle
 
                                     storeDiscoveryData(ip, port, successCredential);
                                 }
+
                                 else
                                 {
                                     result.put("status", "failed").put("reason", "SSH failed");
                                 }
+
                                 return result;
                             });
                         }
@@ -90,9 +87,8 @@ public class Discovery extends AbstractVerticle
 
                     return Future.succeededFuture(result);
                 }
-            }).onFailure(err -> result.put("status", "failed").put("reason", err.getMessage()));
 
-//            futures.add(future);
+            }).onFailure(err -> result.put("status", "failed").put("reason", err.getMessage()));
 
             future.onComplete(AsyncResult ->
             {
@@ -154,7 +150,7 @@ public class Discovery extends AbstractVerticle
 
     private Future<Boolean> checkPort(String ip, int port)
     {
-        Promise<Boolean> promise = Promise.promise();
+        var promise = Promise.<Boolean>promise();
 
         vertx.createNetClient().connect(port, ip, res ->
         {
@@ -228,7 +224,7 @@ public class Discovery extends AbstractVerticle
         var futures = new ArrayList<Future<JsonObject>>();
 
         // Using executeBlocking to handle blocking database operations
-        vertx.executeBlocking(blockingPromise ->
+        vertx.executeBlocking(() ->
         {
             for (var i = 0; i < credentialsIds.size(); i++)
             {
@@ -246,28 +242,17 @@ public class Discovery extends AbstractVerticle
                     }
                 });
             }
-
-            Future.all(futures).onComplete(res ->
-            {
-                if (res.succeeded())
-                {
-                    blockingPromise.complete();
-                }
-                else
-                {
-                    blockingPromise.fail(res.cause());
-                }
-            });
-        }, false, res ->
+            return Future.all(futures);
+        }, false, asyncHandler ->
         {
-            if (res.succeeded())
+            if (asyncHandler.succeeded())
             {
                 System.out.println("Successfully extracted credentials");
             }
 
             else
             {
-                System.err.println("Failed to extract credentials: " + res.cause());
+                System.err.println("Failed to extract credentials: " + asyncHandler.cause());
             }
         });
 
@@ -276,7 +261,7 @@ public class Discovery extends AbstractVerticle
 
     private Future<JsonObject> spawnGoProcess(JsonObject ipCredentialObject)
     {
-        return vertx.executeBlocking(promise ->
+        return vertx.executeBlocking(() ->
         {
             Process process = null;
 
@@ -284,7 +269,7 @@ public class Discovery extends AbstractVerticle
 
             try
             {
-                var goExecutable = Main.vertx().getOrCreateContext().config().getString("goExecutablePath");
+                var goExecutable = vertx.getOrCreateContext().config().getString("goExecutablePath");
 
                 var processBuilder = new ProcessBuilder(goExecutable, Constants.DISCOVERY_EVENT, ipCredentialObject.encode()).directory(new java.io.File("/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd"));
 
@@ -322,14 +307,14 @@ public class Discovery extends AbstractVerticle
 
                     System.out.println("Success credentials are : " + result );
 
-                    promise.complete(result); // Return the successful credential as JsonObject
+                    return Future.succeededFuture(result); // Return a succeeded future with the result
                 }
 
                 else
                 {
                     System.err.println("Go process failed with exit code: " + exitCode);
 
-                    promise.fail("Go process failed with exit code: " + exitCode);
+                    return Future.failedFuture("Go process failed with exit code: " + exitCode); // Return a failed future
                 }
             }
 
@@ -337,7 +322,7 @@ public class Discovery extends AbstractVerticle
             {
                 System.err.println("Error starting Go process: " + exception.getMessage());
 
-                promise.fail(exception);
+
             }
 
             finally
@@ -385,5 +370,4 @@ public class Discovery extends AbstractVerticle
 
         }).onFailure(err -> System.err.println("Failed to check for duplicate entry: " + err.getMessage()));
     }
-
 }
