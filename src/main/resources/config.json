@@ -4,5 +4,6 @@
   "goExecutablePath": "/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd/main",
   "jwt_secret_key": "v7dk9fJH4Uj1a7I3BhKwZ89GtbK2g8LP",
   "polling_interval": 60,
-  "port": 8080
+  "port": 8080,
+  "pollerTimeout": 60
 }

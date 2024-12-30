@@ -4,10 +4,12 @@ import com.motadata.constants.Constants;
 import com.motadata.db.Operations;
 
 import io.vertx.core.*;
+import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -21,87 +23,97 @@ public class Discovery extends AbstractVerticle
         vertx.eventBus().localConsumer(Constants.DISCOVERY_VERTICLE, this::discovery);
     }
 
-    public void discovery(io.vertx.core.eventbus.Message<Object> message)
+    public void discovery(Message<Object> message)
     {
-        var requestBody = (JsonObject) message.body();
-
-        var ipRange = requestBody.getString("ip");
-
-        var port = requestBody.getInteger("port");
-
-        var credentialsIds = requestBody.getJsonArray("credentialsIds");
-
-        var ips = extractIpAddresses(ipRange);
-
-        var credentialsList = extractCredentials(credentialsIds);
-
-        message.reply(new JsonObject().put("status", "Discovery started"));
-
-        for (var ip : ips)
+        try
         {
-            // Create a result object for this IP
-            var result = new JsonObject().put("ip", ip);
+            var requestBody = (JsonObject) message.body();
 
-            var future = pingIp(ip).compose(isReachable ->
+            var ipRange = requestBody.getString("ip");
+
+            var port = requestBody.getInteger("port");
+
+            var credentialsIds = requestBody.getJsonArray("credentialsIds");
+
+            var ips = extractIpAddresses(ipRange);
+
+            var credentialsList = extractCredentials(credentialsIds);
+
+            message.reply(new JsonObject().put("status", "Discovery started"));
+
+            for (var ip : ips)
             {
-                if (isReachable)
+                // Create a result object for this IP
+                var result = new JsonObject().put("ip", ip);
+
+                var future = pingIp(ip).compose(isReachable ->
                 {
-                    return checkPort(ip, port).compose(isOpen ->
+                    if (isReachable)
                     {
-                        if (isOpen)
+                        return checkPort(ip, port).compose(isOpen ->
                         {
-                            var ipCredentialObject = new JsonObject().put("ip", ip).put("port", port).put("credentials", new JsonArray(credentialsList));
-
-                            // Spawn Go process with IP
-                            return spawnGoProcess(ipCredentialObject).map(successCredential ->
+                            if (isOpen)
                             {
-                                if (successCredential != null)
+                                var ipCredentialObject = new JsonObject().put("ip", ip).put("port", port).put("credentials", new JsonArray(credentialsList));
+
+                                // Spawn Go process with IP
+                                return spawnGoProcess(ipCredentialObject).map(successCredential ->
                                 {
-                                    // If SSH succeeded and returned a credential
-                                    result.put("status", "success");
+                                    if (successCredential != null)
+                                    {
+                                        // If SSH succeeded and returned a credential
+                                        result.put("status", "success");
 
-                                    storeDiscoveryData(ip, port, successCredential);
-                                }
+                                        storeDiscoveryData(ip, port, successCredential);
+                                    }
 
-                                else
-                                {
-                                    result.put("status", "failed").put("reason", "SSH failed");
-                                }
+                                    else
+                                    {
+                                        result.put("status", "failed").put("reason", "SSH failed");
+                                    }
 
-                                return result;
-                            });
-                        }
+                                    return result;
+                                });
+                            }
 
-                        else
-                        {
-                            result.put("status", "failed").put("reason", "Port not open");
+                            else
+                            {
+                                result.put("status", "failed").put("reason", "Port not open");
 
-                            return Future.succeededFuture(result);
-                        }
-                    });
-                }
+                                return Future.succeededFuture(result);
+                            }
+                        });
+                    }
 
-                else
+                    else
+                    {
+                        result.put("status", "failed").put("reason", "IP not reachable");
+
+                        return Future.succeededFuture(result);
+                    }
+
+                }).onFailure(err -> result.put("status", "failed").put("reason", err.getMessage()));
+
+                future.onComplete(AsyncResult ->
                 {
-                    result.put("status", "failed").put("reason", "IP not reachable");
+                    if (AsyncResult.succeeded())
+                    {
+                        System.out.println("Discovery result for IP " + ip + ": " + AsyncResult.result().encodePrettily());
+                    }
 
-                    return Future.succeededFuture(result);
-                }
-
-            }).onFailure(err -> result.put("status", "failed").put("reason", err.getMessage()));
-
-            future.onComplete(AsyncResult ->
-            {
-                if (AsyncResult.succeeded())
-                {
-                    System.out.println("Discovery result for IP " + ip + ": " + AsyncResult.result().encodePrettily());
-                }
-                else
-                {
-                    System.err.println("Error during discovery for IP " + ip + ": " + AsyncResult.cause().getMessage());
-                }
-            });
+                    else
+                    {
+                        System.err.println("Error during discovery for IP " + ip + ": " + AsyncResult.cause().getMessage());
+                    }
+                });
+            }
         }
+
+        catch (Exception exception)
+        {
+            System.err.println("Error in discovery with exception : " + exception);
+        }
+
     }
 
     private Future<Boolean> pingIp(String ip)
@@ -141,7 +153,7 @@ public class Discovery extends AbstractVerticle
             }
             catch (Exception exception)
             {
-                exception.printStackTrace();
+                System.err.println("Failed to ping ip. " + exception);
 
                 return false; // Return false on exception
             }
@@ -152,20 +164,29 @@ public class Discovery extends AbstractVerticle
     {
         var promise = Promise.<Boolean>promise();
 
-        vertx.createNetClient().connect(port, ip, res ->
+        try
         {
-            if (res.succeeded())
+            vertx.createNetClient().connect(port, ip, res ->
             {
-                promise.complete(true);
-            }
+                if (res.succeeded())
+                {
+                    promise.complete(true);
+                }
 
-            else
-            {
-                System.err.println("Failed to connect to " + ip + ":" + port + " - " + res.cause().getMessage());
+                else
+                {
+                    System.err.println("Failed to connect to " + ip + ":" + port + " - " + res.cause().getMessage());
 
-                promise.complete(false);
-            }
-        });
+                    promise.complete(false);
+                }
+            });
+        }
+        catch (Exception exception)
+        {
+            System.err.println("Failed to check port. " + exception);
+
+            promise.fail(exception);
+        }
 
         return promise.future();
     }
@@ -177,41 +198,70 @@ public class Discovery extends AbstractVerticle
 
         var query = new JsonObject().put("_id", credentialsId);
 
-        // Return null if no credential found
-        Operations.findOne(Constants.CREDENTIALS_COLLECTION, query).onSuccess(promise::complete).onFailure(err -> promise.fail(err.getMessage()));
+        try
+        {
+            // Return null if no credential found
+            Operations.findOne(Constants.CREDENTIALS_COLLECTION, query)
+                    .onComplete(result ->
+                    {
+                        if(result.succeeded())
+                        {
+                            promise.complete((JsonObject) result);
+                        }
 
-        return promise.future(); // This should be handled asynchronously in a real application
+                        else
+                        {
+                            promise.fail(result.cause());
+                        }
+                    });
+        }
+
+        catch (Exception exception)
+        {
+            System.err.println("Failed to retrieve credentials by id. " + exception);
+        }
+
+        return promise.future();
     }
 
     private static ArrayList<String> extractIpAddresses(String ipRange)
     {
         var ipList = new ArrayList<String>();
 
-        // Check if the input is a range (contains '-')
-        if (ipRange.contains("-"))
+        try
         {
-            var parts = ipRange.split("\\.");
-
-            var baseIp = parts[0] + "." + parts[1] + "." + parts[2]; // Get first three octets
-
-            var startOctet = parts[3].split("-")[0]; // Get starting octet
-
-            var endOctet = parts[3].split("-")[1]; // Get ending octet
-
-            var start = Integer.parseInt(startOctet);
-
-            var end = Integer.parseInt(endOctet);
-
-            // Generate IPs from baseIp + start to baseIp + end
-            for (var i = start; i <= end; i++)
+            // Check if the input is a range (contains '-')
+            if (ipRange.contains("-"))
             {
-                ipList.add(baseIp + "." + i);
+                var parts = ipRange.split("\\.");
+
+                var baseIp = parts[0] + "." + parts[1] + "." + parts[2]; // Get first three octets
+
+                var startOctet = parts[3].split("-")[0]; // Get starting octet
+
+                var endOctet = parts[3].split("-")[1]; // Get ending octet
+
+                var start = Integer.parseInt(startOctet);
+
+                var end = Integer.parseInt(endOctet);
+
+                // Generate IPs from baseIp + start to baseIp + end
+                for (var i = start; i <= end; i++)
+                {
+                    ipList.add(baseIp + "." + i);
+                }
+            }
+
+            else
+            {
+                // If not a range, just add the single IP
+                ipList.add(ipRange.trim());
             }
         }
-        else
+
+        catch (Exception exception)
         {
-            // If not a range, just add the single IP
-            ipList.add(ipRange.trim());
+            System.err.println("Failed to extract ip addresses. " + exception);
         }
 
         return ipList;
@@ -223,38 +273,46 @@ public class Discovery extends AbstractVerticle
 
         var futures = new ArrayList<Future<JsonObject>>();
 
-        // Using executeBlocking to handle blocking database operations
-        vertx.executeBlocking(() ->
+        try
         {
-            for (var i = 0; i < credentialsIds.size(); i++)
+            // Using executeBlocking to handle blocking database operations
+            vertx.executeBlocking(() ->
             {
-                var credId = credentialsIds.getString(i);
-
-                var credentialFuture = retrieveCredentialById(credId);
-
-                futures.add(credentialFuture);
-
-                credentialFuture.onSuccess(credential ->
+                for (var i = 0; i < credentialsIds.size(); i++)
                 {
-                    if (credential != null)
-                    {
-                        credentialsList.add(credential);
-                    }
-                });
-            }
-            return Future.all(futures);
-        }, false, asyncHandler ->
-        {
-            if (asyncHandler.succeeded())
-            {
-                System.out.println("Successfully extracted credentials");
-            }
+                    var credId = credentialsIds.getString(i);
 
-            else
+                    var credentialFuture = retrieveCredentialById(credId);
+
+                    futures.add(credentialFuture);
+
+                    credentialFuture.onComplete(result ->
+                    {
+                        if (result != null)
+                        {
+                            credentialsList.add(result.result());
+                        }
+                    });
+                }
+                return Future.all(futures);
+            }, false, asyncHandler ->
             {
-                System.err.println("Failed to extract credentials: " + asyncHandler.cause());
-            }
-        });
+                if (asyncHandler.succeeded())
+                {
+                    System.out.println("Successfully extracted credentials");
+                }
+
+                else
+                {
+                    System.err.println("Failed to extract credentials: " + asyncHandler.cause());
+                }
+            });
+        }
+
+        catch (Exception exception)
+        {
+            System.err.println("Failed to extract credentials. " + exception);
+        }
 
         return credentialsList;
     }
@@ -267,11 +325,18 @@ public class Discovery extends AbstractVerticle
 
             BufferedReader reader = null;
 
+            var successfulCredential = "";
+
             try
             {
                 var goExecutable = vertx.getOrCreateContext().config().getString("goExecutablePath");
 
-                var processBuilder = new ProcessBuilder(goExecutable, Constants.DISCOVERY_EVENT, ipCredentialObject.encode()).directory(new java.io.File("/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd"));
+                if (goExecutable == null || goExecutable.isEmpty())
+                {
+                    throw new Exception("goExecutablePath is not set in the configuration.");
+                }
+
+                var processBuilder = new ProcessBuilder(goExecutable, Constants.DISCOVERY_EVENT, ipCredentialObject.encode()).directory(new File("/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd/"));
 
                 process = processBuilder.start();
 
@@ -281,19 +346,18 @@ public class Discovery extends AbstractVerticle
 
                 var line = "";
 
-                var successfulCredential = "";
-
                 while ((line = reader.readLine()) != null)
                 {
-                    output.append(line).append("\n"); // Capture output from Go program
+                    output.append(line).append("\n");
 
-                    // Check for the success message that contains credentials
                     if (line.contains("Successful login for IP"))
                     {
-                        // Extract the credentials from the line (e.g., after the colon)
-                        var credentialsString = line.substring(line.indexOf("{"));
+                        var startIndex = line.indexOf("{");
 
-                        successfulCredential = credentialsString.trim();
+                        if (startIndex != -1)
+                        {
+                            successfulCredential = line.substring(startIndex).trim();
+                        }
                     }
                 }
 
@@ -301,39 +365,42 @@ public class Discovery extends AbstractVerticle
 
                 var exitCode = process.waitFor();
 
-                if (exitCode == 0 )
+                var result = new JsonObject(successfulCredential);
+
+                if (exitCode == 0)
                 {
-                    var result = new JsonObject(successfulCredential);
+                    System.out.println("Success credentials are: " + result);
 
-                    System.out.println("Success credentials are : " + result );
-
-                    return Future.succeededFuture(result); // Return a succeeded future with the result
                 }
 
                 else
                 {
-                    System.err.println("Go process failed with exit code: " + exitCode);
+                    var errorMessage = "Go process failed with exit code: " + exitCode;
 
-                    return Future.failedFuture("Go process failed with exit code: " + exitCode); // Return a failed future
+                    System.err.println(errorMessage);
+
                 }
+                
+                return result;
+
             }
 
-            catch (Exception exception)
+            catch ( Exception exception)
             {
                 System.err.println("Error starting Go process: " + exception.getMessage());
 
-
+                return null;
             }
 
             finally
             {
-                // Ensure that we properly kill the process and close resources
                 if (reader != null)
                 {
                     try
                     {
                         reader.close();
                     }
+
                     catch (IOException e)
                     {
                         System.err.println("Failed to close reader: " + e.getMessage());
@@ -342,7 +409,7 @@ public class Discovery extends AbstractVerticle
 
                 if (process != null)
                 {
-                    process.destroy(); // Kill the process
+                    process.destroy();
                 }
             }
         });
@@ -353,21 +420,41 @@ public class Discovery extends AbstractVerticle
         // Query to check for duplicates
         var query = new JsonObject().put("ip", ip);
 
-        // Check for existing entry
-        Operations.findOne(Constants.OBJECTS_COLLECTION, query).onSuccess(existingEntry ->
+        try
         {
-            if (existingEntry == null)
+            // Check for existing entry
+            Operations.findOne(Constants.OBJECTS_COLLECTION, query).onComplete(result ->
             {
-                // No duplicate found, insert the new data
-                var discoveryData = new JsonObject().put("ip", ip).put("credentials", credential).put("port", port);
+                if (result == null)
+                {
+                    // No duplicate found, insert the new data
+                    var discoveryData = new JsonObject().put("ip", ip).put("credentials", credential).put("port", port);
 
-                Operations.insert(Constants.OBJECTS_COLLECTION, discoveryData).onSuccess(result -> System.out.println("Successfully stored discovery data: " + discoveryData.encodePrettily())).onFailure(err -> System.err.println("Failed to store discovery data: " + err.getMessage()));
-            }
-            else
-            {
-                System.out.println("Duplicate entry found for IP: " + ip + ", Port: " + port);
-            }
+                    Operations.insert(Constants.OBJECTS_COLLECTION, discoveryData).onComplete(asyncResult ->
+                    {
+                        if (asyncResult != null)
+                        {
+                            System.out.println("Successfully stored discovery data: " + discoveryData.encodePrettily());
+                        }
 
-        }).onFailure(err -> System.err.println("Failed to check for duplicate entry: " + err.getMessage()));
+                        else
+                        {
+                            System.err.println("Failed to store discovery data.");
+                        }
+                    });
+                }
+
+                else
+                {
+                    System.out.println("Duplicate entry found for IP: " + ip + ", Port: " + port);
+                }
+
+            });
+        }
+
+        catch (Exception exception)
+        {
+            System.err.println("Failed to store Discovery Data");
+        }
     }
 }

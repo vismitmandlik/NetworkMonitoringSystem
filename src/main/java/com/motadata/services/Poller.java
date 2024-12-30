@@ -6,6 +6,7 @@ import io.vertx.core.json.JsonArray;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
+import java.util.concurrent.TimeUnit;
 
 import static com.motadata.services.ObjectManager.storePollerResults;
 
@@ -54,7 +55,7 @@ public class Poller
                     }
                 }
 
-                process.waitFor();
+                process.waitFor(Main.vertx().getOrCreateContext().config().getInteger("pollerTimeout"), TimeUnit.SECONDS);
 
                 // Print polling result
                 if (process.exitValue() == 0)
@@ -76,7 +77,7 @@ public class Poller
             }
             catch (Exception exception)
             {
-                exception.printStackTrace();
+                System.err.println("Failed to poll device. " + exception);
 
                 return false;
             }
@@ -92,15 +93,17 @@ public class Poller
 
                 System.out.println("Poll process completed");
             }
+
         }, false, asyncHandler ->
         {
             if (asyncHandler.succeeded())
             {
                 System.out.println("Poll completed successfully");
             }
+
             else
             {
-                System.err.println("Poll failed with error: " + asyncHandler.cause().getMessage());
+                System.err.println("Poll failed with error: " + asyncHandler.cause());
             }
         });
     }
