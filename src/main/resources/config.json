@@ -6,5 +6,6 @@
   "polling_interval": 60,
   "port": 8080,
   "pollerTimeout": 60,
-  "minMongodbPoolSize": 3
+  "minMongodbPoolSize": 3,
+  "maxMongodbPoolSize": 10
 }

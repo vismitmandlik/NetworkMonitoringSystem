@@ -3,6 +3,7 @@ package com.motadata.services;
 import com.motadata.Main;
 import com.motadata.constants.Constants;
 import com.motadata.db.Operations;
+import com.motadata.utils.Utils;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
@@ -143,7 +144,7 @@ public class ObjectManager extends AbstractVerticle
     // Checks if the device IP is reachable and if the port is open
     private static Future<Boolean> checkDeviceAvailability(String ip, int port)
     {
-        return pingIp(ip).compose(isReachable ->
+        return Utils.ping(ip).compose(isReachable ->
         {
             if (isReachable)
             {
@@ -153,40 +154,6 @@ public class ObjectManager extends AbstractVerticle
             else
             {
                 return Future.failedFuture("Device is not reachable");
-            }
-        });
-    }
-
-    private static Future<Boolean> pingIp(String ip)
-    {
-        return Main.vertx().executeBlocking(() ->
-        {
-            try
-            {
-                var processBuilder = new ProcessBuilder("ping", "-c", "1", ip);
-
-                var process = processBuilder.start();
-
-                var exitCode = process.waitFor();
-
-                if (exitCode == 0)
-                {
-                    return true;
-                }
-
-                else
-                {
-                    System.err.println("Ping failed for " + ip );
-
-                    return false;
-                }
-            }
-
-            catch (Exception exception)
-            {
-                System.err.println("Ping failed: " + exception.getMessage());
-
-                return false;
             }
         });
     }

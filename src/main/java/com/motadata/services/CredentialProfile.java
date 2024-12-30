@@ -25,19 +25,27 @@ public class CredentialProfile
         // Check if the name already exists in the database
         var query = new JsonObject().put("name", name);
 
-        Operations.findOne(Constants.CREDENTIALS_COLLECTION, query).onSuccess(existingCredential ->
+        try
         {
-            if (existingCredential != null)
+            Operations.findOne(Constants.CREDENTIALS_COLLECTION, query).onSuccess(existingCredential ->
             {
-                // Device ID already exists, respond with an error
-                context.response().setStatusCode(400).end("Credential for this cred name : "+name+" already exists.");
-            }
-            else
-            {
-                // Insert new credential into the database
-                Operations.insert(Constants.CREDENTIALS_COLLECTION, newCredential).onSuccess(id -> context.response().setStatusCode(201).end("Credential saved successfully.")).onFailure(err -> context.response().setStatusCode(500).end("Error saving credential: " + err.getMessage()));
-            }
-        }).onFailure(err -> context.response().setStatusCode(500).end("Error checking for existing credentials: " + err.getMessage()));
+                if (existingCredential != null)
+                {
+                    // Device ID already exists, respond with an error
+                    context.response().setStatusCode(400).end("Credential for this cred name : "+name+" already exists.");
+                }
+                else
+                {
+                    // Insert new credential into the database
+                    Operations.insert(Constants.CREDENTIALS_COLLECTION, newCredential).onSuccess(id -> context.response().setStatusCode(201).end("Credential saved successfully.")).onFailure(err -> context.response().setStatusCode(500).end("Error saving credential: " + err.getMessage()));
+                }
+            }).onFailure(err -> context.response().setStatusCode(500).end("Error checking for existing credentials: " + err.getMessage()));
+        }
+        catch (Exception exception)
+        {
+
+        }
+
     }
 
     public static void getAllCredentials(RoutingContext context)

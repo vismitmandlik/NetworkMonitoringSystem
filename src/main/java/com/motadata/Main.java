@@ -12,7 +12,7 @@ import java.util.logging.Logger;
 
 public class Main
 {
-    private static final Vertx vertx = Vertx.vertx(new VertxOptions().setWorkerPoolSize(Runtime.getRuntime().availableProcessors() * 2));
+    private static final Vertx vertx = Vertx.vertx(new VertxOptions().setWorkerPoolSize(4).setEventLoopPoolSize(Runtime.getRuntime().availableProcessors() * 2));
 
     public static Vertx vertx()
     {
@@ -26,58 +26,64 @@ public class Main
 
         mongoLogger.setLevel(Level.OFF);
 
-        /* Set config.json path and load configuration from it */
-        ConfigRetriever.create(vertx, new io.vertx.config.ConfigRetrieverOptions()
-                .addStore(new ConfigStoreOptions()
-                        .setType("file")
-                        .setFormat("json")
-                        .setConfig(new io.vertx.core.json.JsonObject().put("path", "src/main/resources/config.json"))
-                )).getConfig(Result ->
+        try
         {
-            if (Result.failed())
+            /* Set config.json path and load configuration from it */
+            ConfigRetriever.create(vertx, new io.vertx.config.ConfigRetrieverOptions()
+                    .addStore(new ConfigStoreOptions()
+                            .setType("file")
+                            .setFormat("json")
+                            .setConfig(new io.vertx.core.json.JsonObject().put("path", "src/main/resources/config.json"))
+                    )).getConfig(Result ->
             {
-                System.err.println("Failed to load configuration: " + Result.cause());
-
-                return;
-            }
-
-            var config = Result.result();
-
-            System.out.println("Configuration: " + config.encodePrettily());
-
-            // Initialize MongoDB client and check if the connection is successful
-            MongoClient.init(config).compose(result ->
-            {
-                System.out.println("Successfully connected to MongoDB");
-
-                var serverOptions = new DeploymentOptions().setConfig(config).setInstances(Runtime.getRuntime().availableProcessors() * 2);
-
-                // Deploy Server Verticle first
-                return deployVerticle(Server.class.getName(), serverOptions);
-
-            }).compose(serverResponse ->
-            {
-                System.out.println("Successfully deployed Server Verticle");
-
-                var discoveryOptions = new DeploymentOptions().setConfig(config).setInstances(Runtime.getRuntime().availableProcessors() * 2);
-
-                // Deploy Discovery Verticle
-                return deployVerticle(Discovery.class.getName(), discoveryOptions);
-
-            }).onComplete(response ->
-            {
-                if (response.succeeded())
+                if (Result.failed())
                 {
-                    System.out.println("Successfully deployed Discovery Verticle");
-                }
-                else
-                {
-                    System.err.println("Failed to deploy Verticle: " + response.cause());
+                    System.err.println("Failed to load configuration: " + Result.cause());
 
-                    vertx.close();
+                    return;
                 }
+
+                var config = Result.result();
+
+                // Initialize MongoDB client and check if the connection is successful
+                MongoClient.init(config).compose(result ->
+                {
+                    System.out.println("Successfully connected to MongoDB");
+
+                    var serverOptions = new DeploymentOptions().setConfig(config).setInstances(Runtime.getRuntime().availableProcessors());
+
+                    // Deploy Server Verticle first
+                    return deployVerticle(Server.class.getName(), serverOptions);
+
+                }).compose(serverResponse ->
+                {
+                    System.out.println("Successfully deployed Server Verticle");
+
+                    var discoveryOptions = new DeploymentOptions().setConfig(config).setInstances(Runtime.getRuntime().availableProcessors());
+
+                    // Deploy Discovery Verticle
+                    return deployVerticle(Discovery.class.getName(), discoveryOptions);
+
+                }).onComplete(response ->
+                {
+                    if (response.succeeded())
+                    {
+                        System.out.println("Successfully deployed Discovery Verticle");
+                    }
+                    else
+                    {
+                        System.err.println("Failed to deploy Verticle: " + response.cause());
+
+                        vertx.close();
+                    }
+                });
             });
-        });
+        }
+        catch (Exception exception)
+        {
+            System.err.println("Failed to deploy verticle: " + exception);
+        }
+
 
     }
 

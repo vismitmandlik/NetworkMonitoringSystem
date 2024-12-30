@@ -1,8 +1,10 @@
 package com.motadata.services;
 
+import com.motadata.Main;
 import com.motadata.constants.Constants;
 import com.motadata.db.Operations;
 
+import com.motadata.utils.Utils;
 import io.vertx.core.*;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
@@ -35,7 +37,7 @@ public class Discovery extends AbstractVerticle
 
             var credentialsIds = requestBody.getJsonArray("credentialsIds");
 
-            var ips = extractIpAddresses(ipRange);
+            var ips = Utils.extractIpAddresses(ipRange);
 
             var credentialsList = extractCredentials(credentialsIds);
 
@@ -46,11 +48,11 @@ public class Discovery extends AbstractVerticle
                 // Create a result object for this IP
                 var result = new JsonObject().put("ip", ip);
 
-                var future = pingIp(ip).compose(isReachable ->
+                var future = Utils.ping(ip).compose(isReachable ->
                 {
                     if (isReachable)
                     {
-                        return checkPort(ip, port).compose(isOpen ->
+                        return Utils.checkPort(ip, port).compose(isOpen ->
                         {
                             if (isOpen)
                             {
@@ -64,7 +66,7 @@ public class Discovery extends AbstractVerticle
                                         // If SSH succeeded and returned a credential
                                         result.put("status", "success");
 
-                                        storeDiscoveryData(ip, port, successCredential);
+                                        storeData(ip, port, successCredential);
                                     }
 
                                     else
@@ -115,82 +117,6 @@ public class Discovery extends AbstractVerticle
         }
     }
 
-    private Future<Boolean> pingIp(String ip)
-    {
-        return vertx.executeBlocking(() ->
-        {
-            try
-            {
-                var processBuilder = new ProcessBuilder("ping", "-c", "1", ip);
-
-                var process = processBuilder.start();
-
-                var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-
-                var output = new StringBuilder();
-
-                var line = "";
-
-                while ((line = reader.readLine()) != null)
-                {
-                    output.append(line).append("\n");
-                }
-
-                var exitCode = process.waitFor();
-
-                if (exitCode == 0)
-                {
-                    return true;
-                }
-
-                else
-                {
-                    System.err.println("Ping failed for " + ip + ":\n" + output);
-
-                    return false;
-                }
-            }
-
-            catch (Exception exception)
-            {
-                System.err.println("Failed to ping ip. " + exception);
-
-                return false; // Return false on exception
-            }
-        });
-    }
-
-    private Future<Boolean> checkPort(String ip, int port)
-    {
-        var promise = Promise.<Boolean>promise();
-
-        try
-        {
-            vertx.createNetClient().connect(port, ip, res ->
-            {
-                if (res.succeeded())
-                {
-                    promise.complete(true);
-                }
-
-                else
-                {
-                    System.err.println("Failed to connect to " + ip + ":" + port + " - " + res.cause().getMessage());
-
-                    promise.complete(false);
-                }
-            });
-        }
-        catch (Exception exception)
-        {
-            System.err.println("Failed to check port. " + exception);
-
-            promise.fail(exception);
-        }
-
-        return promise.future();
-    }
-
     private Future<JsonObject> retrieveCredentialById(String credentialsId)
     {
         // Simulate fetching a credential from the database based on the ID
@@ -206,7 +132,7 @@ public class Discovery extends AbstractVerticle
                     {
                         if(result.succeeded())
                         {
-                            promise.complete((JsonObject) result);
+                            promise.complete(result.result());
                         }
 
                         else
@@ -222,49 +148,6 @@ public class Discovery extends AbstractVerticle
         }
 
         return promise.future();
-    }
-
-    private static ArrayList<String> extractIpAddresses(String ipRange)
-    {
-        var ipList = new ArrayList<String>();
-
-        try
-        {
-            // Check if the input is a range (contains '-')
-            if (ipRange.contains("-"))
-            {
-                var parts = ipRange.split("\\.");
-
-                var baseIp = parts[0] + "." + parts[1] + "." + parts[2]; // Get first three octets
-
-                var startOctet = parts[3].split("-")[0]; // Get starting octet
-
-                var endOctet = parts[3].split("-")[1]; // Get ending octet
-
-                var start = Integer.parseInt(startOctet);
-
-                var end = Integer.parseInt(endOctet);
-
-                // Generate IPs from baseIp + start to baseIp + end
-                for (var i = start; i <= end; i++)
-                {
-                    ipList.add(baseIp + "." + i);
-                }
-            }
-
-            else
-            {
-                // If not a range, just add the single IP
-                ipList.add(ipRange.trim());
-            }
-        }
-
-        catch (Exception exception)
-        {
-            System.err.println("Failed to extract ip addresses. " + exception);
-        }
-
-        return ipList;
     }
 
     private List<JsonObject> extractCredentials(JsonArray credentialsIds)
@@ -412,43 +295,54 @@ public class Discovery extends AbstractVerticle
                     process.destroy();
                 }
             }
-        });
+        },false);
     }
 
-    private void storeDiscoveryData(String ip, int port, JsonObject credential)
+    private void storeData(String ip, int port, JsonObject credential)
     {
         // Query to check for duplicates
         var query = new JsonObject().put("ip", ip);
 
         try
         {
-            // Check for existing entry
-            Operations.findOne(Constants.OBJECTS_COLLECTION, query).onComplete(result ->
+            Main.vertx().executeBlocking(() ->
             {
-                if (result == null)
+                // Check for existing entry
+                Operations.findOne(Constants.OBJECTS_COLLECTION, query).onComplete(result ->
                 {
-                    // No duplicate found, insert the new data
-                    var discoveryData = new JsonObject().put("ip", ip).put("credentials", credential).put("port", port);
-
-                    Operations.insert(Constants.OBJECTS_COLLECTION, discoveryData).onComplete(asyncResult ->
+                    if (result == null)
                     {
-                        if (asyncResult != null)
-                        {
-                            System.out.println("Successfully stored discovery data: " + discoveryData.encodePrettily());
-                        }
+                        // No duplicate found, insert the new data
+                        var discoveryData = new JsonObject().put("ip", ip).put("credentials", credential).put("port", port);
 
-                        else
+                        Operations.insert(Constants.OBJECTS_COLLECTION, discoveryData).onComplete(asyncResult ->
                         {
-                            System.err.println("Failed to store discovery data.");
-                        }
-                    });
-                }
+                            if (asyncResult != null)
+                            {
+                                System.out.println("Successfully stored discovery data: " + discoveryData.encodePrettily());
+                            }
 
-                else
+                            else
+                            {
+                                System.err.println("Failed to store discovery data.");
+                            }
+                        });
+
+                    }
+
+                    else
+                    {
+                        System.out.println("Duplicate entry found for IP: " + ip + ", Port: " + port);
+                    }
+                });
+
+                return null;
+            },false, result ->
+            {
+                if (result.failed())
                 {
-                    System.out.println("Duplicate entry found for IP: " + ip + ", Port: " + port);
+                    System.err.println("Failed to store discovery data. " + result.cause());
                 }
-
             });
         }
 
