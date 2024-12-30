@@ -5,5 +5,6 @@
   "jwt_secret_key": "v7dk9fJH4Uj1a7I3BhKwZ89GtbK2g8LP",
   "polling_interval": 60,
   "port": 8080,
-  "pollerTimeout": 60
+  "pollerTimeout": 60,
+  "minMongodbPoolSize": 3
 }
