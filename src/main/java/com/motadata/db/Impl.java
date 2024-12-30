@@ -40,7 +40,7 @@ public class Impl
         }
         catch (Exception exception)
         {
-            exception.printStackTrace();
+            System.err.println("Failed to apply migrations. " + exception);
         }
     }
 }

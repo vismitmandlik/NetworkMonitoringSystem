@@ -72,13 +72,13 @@ public class Server extends AbstractVerticle
         router.route("/api/object/*").subRouter(objectRouter);
 
         // Initialize routes for each resource
-        User.initRoutes(userRouter);
+        User.init(userRouter);
 
-        CredentialProfile.initRoutes(credentialRouter);
+        CredentialProfile.init(credentialRouter);
 
-        Discovery.initRoutes(discoveryRouter);
+        Discovery.init(discoveryRouter);
 
-        Object.initRoutes(objectRouter);
+        Object.init(objectRouter);
 
     }
 }

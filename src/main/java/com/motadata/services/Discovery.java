@@ -113,7 +113,6 @@ public class Discovery extends AbstractVerticle
         {
             System.err.println("Error in discovery with exception : " + exception);
         }
-
     }
 
     private Future<Boolean> pingIp(String ip)
@@ -151,6 +150,7 @@ public class Discovery extends AbstractVerticle
                     return false;
                 }
             }
+
             catch (Exception exception)
             {
                 System.err.println("Failed to ping ip. " + exception);

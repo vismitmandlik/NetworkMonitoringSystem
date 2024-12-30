@@ -5,7 +5,7 @@ import io.vertx.ext.web.Router;
 public class CredentialProfile
 {
     // Method to register routes
-    public static void initRoutes(Router router)
+    public static void init(Router router)
     {
         router.post("/").handler(com.motadata.services.CredentialProfile::saveCredentials);
 

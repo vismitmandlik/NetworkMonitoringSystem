@@ -6,7 +6,7 @@ import io.vertx.ext.web.Router;
 
 public class Discovery
 {
-    public static void initRoutes(Router router)
+    public static void init(Router router)
     {
         router.post("/").handler(context -> context.vertx().eventBus().request(Constants.DISCOVERY_VERTICLE, context.body().asJsonObject(), reply ->
                 {

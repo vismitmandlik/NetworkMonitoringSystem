@@ -32,21 +32,21 @@ public class Main
                         .setType("file")
                         .setFormat("json")
                         .setConfig(new io.vertx.core.json.JsonObject().put("path", "src/main/resources/config.json"))
-                )).getConfig(configResult ->
+                )).getConfig(Result ->
         {
-            if (configResult.failed())
+            if (Result.failed())
             {
-                System.err.println("Failed to load configuration: " + configResult.cause());
+                System.err.println("Failed to load configuration: " + Result.cause());
 
                 return;
             }
 
-            var config = configResult.result();
+            var config = Result.result();
 
             System.out.println("Configuration: " + config.encodePrettily());
 
             // Initialize MongoDB client and check if the connection is successful
-            MongoClient.init(config).compose(initResult ->
+            MongoClient.init(config).compose(result ->
             {
                 System.out.println("Successfully connected to MongoDB");
 
@@ -64,11 +64,18 @@ public class Main
                 // Deploy Discovery Verticle
                 return deployVerticle(Discovery.class.getName(), discoveryOptions);
 
-            }).onSuccess(discoveryResponse -> System.out.println("Successfully deployed Discovery Verticle")).onFailure(err ->
+            }).onComplete(response ->
             {
-                System.err.println("Failed to deploy Verticle: " + err.getMessage());
+                if (response.succeeded())
+                {
+                    System.out.println("Successfully deployed Discovery Verticle");
+                }
+                else
+                {
+                    System.err.println("Failed to deploy Verticle: " + response.cause());
 
-                vertx.close();
+                    vertx.close();
+                }
             });
         });
 
@@ -79,17 +86,25 @@ public class Main
     {
         Promise<Void> promise = Promise.promise();
 
-        vertx.deployVerticle(verticleName, options, deployResult ->
+        try
         {
-            if (deployResult.succeeded())
+            vertx.deployVerticle(verticleName, options, result ->
             {
-                promise.complete();
-            }
-            else
-            {
-                promise.fail(deployResult.cause());
-            }
-        });
+                if (result.succeeded())
+                {
+                    promise.complete();
+                }
+                else
+                {
+                    promise.fail(result.cause());
+                }
+            });
+        }
+
+        catch (Exception exception)
+        {
+            System.err.println("Failed to deploy verticle: " + exception);
+        }
 
         return promise.future();
     }

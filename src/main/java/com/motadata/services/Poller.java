@@ -65,7 +65,6 @@ public class Poller
                     storePollerResults(outputLines);
 
                     return true;
-
                 }
 
                 else
@@ -75,12 +74,14 @@ public class Poller
                     return false;
                 }
             }
+
             catch (Exception exception)
             {
                 System.err.println("Failed to poll device. " + exception);
 
                 return false;
             }
+
             finally
             {
                 // Ensure the process is destroyed if it's still running

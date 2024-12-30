@@ -14,12 +14,15 @@ public class MongoClient
     {
         var connectionString = config.getString("connection_string", "mongodb://localhost:27017");
 
+        System.out.println(connectionString);
+
         var dbName = config.getString("db_name", Constants.DB_NAME);
+
 
         System.out.println("Connecting to Mongodb...");
 
         /* Set minPoolSize = No. of Verticles and maxPoolSize = 100 {default} */
-        MONGO_CLIENT = io.vertx.ext.mongo.MongoClient.createShared(Main.vertx(), new JsonObject().put("connection_string", connectionString).put("db_name", dbName).put("minPoolSize", 3));
+        MONGO_CLIENT = io.vertx.ext.mongo.MongoClient.createShared(Main.vertx(), new JsonObject().put("connection_string", connectionString).put("db_name", dbName).put(Main.vertx().getOrCreateContext().config().getString("minMongodbPoolSize"), 3));
 
         /* Create a promise to track the success or failure of the connection */
         Promise<Void> promise = Promise.promise();

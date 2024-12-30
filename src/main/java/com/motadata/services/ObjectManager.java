@@ -3,6 +3,7 @@ package com.motadata.services;
 import com.motadata.Main;
 import com.motadata.constants.Constants;
 import com.motadata.db.Operations;
+import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.json.JsonArray;
@@ -12,21 +13,16 @@ import io.vertx.ext.web.RoutingContext;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import static com.motadata.services.Poller.pollDevice;
 
-public class ObjectManager
+public class ObjectManager extends AbstractVerticle
 {
     private static long TIMER_ID = -1;
 
     private static final int BATCH_SIZE = 25;
 
     private static final Queue<JsonObject> deviceQueue = new ConcurrentLinkedQueue<>();
-
-    // Fixed thread pool with 4 threads for batch processing
-    private static final ExecutorService batchThreadPool = Executors.newFixedThreadPool(4);
 
     public static void provisionDevices(RoutingContext context)
     {
@@ -47,8 +43,8 @@ public class ObjectManager
 
         fetchDeviceDetails(deviceIds).onSuccess(devices ->
         {
-            // Filter devices based on IP reachability and open port
-            var reachableDevices = new JsonArray();
+            // Use splitIntoBatches to split the devices into manageable batches
+//            List<JsonArray> deviceBatches = splitIntoBatches(devices);
 
             for (var device : devices)
             {
@@ -70,6 +66,7 @@ public class ObjectManager
             {
                 startPollingTask( event, pollInterval);
             }
+
             else
             {
                 System.out.println("Polling is already active.");
@@ -101,8 +98,7 @@ public class ObjectManager
                 }
 
                 // Use a fixed thread pool to poll devices concurrently
-                batchThreadPool.submit(() -> pollDevice(batch, event));
-
+                pollDevice(batch, event);
             }
         });
     }
@@ -111,17 +107,18 @@ public class ObjectManager
     {
         var promise = Promise.<List<JsonObject>>promise();
 
-        Operations.findAll(Constants.OBJECTS_COLLECTION, new JsonObject().put("_id", new JsonObject().put("$in", deviceIds))).onSuccess(devices ->
+        Operations.findAll(Constants.OBJECTS_COLLECTION, new JsonObject().put("_id", new JsonObject().put("$in", deviceIds))).onComplete(result ->
         {
-            if (devices.isEmpty())
+            if (result.failed())
             {
                 promise.fail("No devices found with the provided IDs");
             }
+
             else
             {
-                promise.complete(devices);
+                promise.complete(result.result());
             }
-        }).onFailure(promise::fail);
+        });
 
         return promise.future();
     }
@@ -162,7 +159,7 @@ public class ObjectManager
 
     private static Future<Boolean> pingIp(String ip)
     {
-        return Main.vertx().executeBlocking(promise ->
+        return Main.vertx().executeBlocking(() ->
         {
             try
             {
@@ -174,16 +171,22 @@ public class ObjectManager
 
                 if (exitCode == 0)
                 {
-                    promise.complete(true);
+                    return true;
                 }
+
                 else
                 {
-                    promise.complete(false);
+                    System.err.println("Ping failed for " + ip );
+
+                    return false;
                 }
             }
-            catch (Exception e)
+
+            catch (Exception exception)
             {
-                promise.fail("Ping failed: " + e.getMessage());
+                System.err.println("Ping failed: " + exception.getMessage());
+
+                return false;
             }
         });
     }
@@ -248,29 +251,6 @@ public class ObjectManager
         {
             return 0.0;
         }
-    }
-
-    private static List<JsonArray> splitIntoBatches(JsonArray devices)
-    {
-        List<JsonArray> batches = new java.util.ArrayList<>();
-
-        int totalDevices = devices.size();
-
-        for (int i = 0; i < totalDevices; i += BATCH_SIZE)
-        {
-            int end = Math.min(i + 25, totalDevices);
-
-            JsonArray batch = devices.getJsonArray(i);
-
-            // Add devices to the batch
-            for (int j = i; j < end; j++) {
-                batch.add(devices.getJsonObject(j));  // Add device to the batch
-            }
-
-            batches.add(batch);
-        }
-
-        return batches;
     }
 
     private static String errorResponse(String message)
