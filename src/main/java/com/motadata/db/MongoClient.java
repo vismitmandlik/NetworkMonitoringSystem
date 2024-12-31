@@ -18,29 +18,37 @@ public class MongoClient
 
         var minPoolSize = config.getInteger("minMongodbPoolSize", 3);
 
-        var maxPoolSize = config.getInteger("minMongodbPoolSize", 3);
+        var maxPoolSize = config.getInteger("maxMongodbPoolSize", 8);
 
         System.out.println("Connecting to Mongodb...");
-
-        /* Set minPoolSize = No. of Verticles and maxPoolSize = 100 {default} */
-        MONGO_CLIENT = io.vertx.ext.mongo.MongoClient.createShared(Main.vertx(), new JsonObject().put("connection_string", connectionString).put("db_name", dbName).put("minPoolSize", minPoolSize).put("maxPoolSize", maxPoolSize));
 
         /* Create a promise to track the success or failure of the connection */
         Promise<Void> promise = Promise.promise();
 
-        MONGO_CLIENT.runCommand("ping", new JsonObject().put("ping", 1), response ->
+        try
         {
-            if (response.succeeded())
-            {
-                promise.complete();
-            }
-            else
-            {
-                System.err.println("Failed to connect: " + response.cause().getMessage());
+            /* Set minPoolSize = No. of Verticles and maxPoolSize = 100 {default} */
+            MONGO_CLIENT = io.vertx.ext.mongo.MongoClient.createShared(Main.vertx(), new JsonObject().put("connection_string", connectionString).put("db_name", dbName).put("minPoolSize", minPoolSize).put("maxPoolSize", maxPoolSize));
 
-                promise.fail(response.cause());
-            }
-        });
+            MONGO_CLIENT.runCommand("ping", new JsonObject().put("ping", 1), response ->
+            {
+                if (response.succeeded())
+                {
+                    promise.complete();
+                }
+                else
+                {
+                    System.err.println("Failed to connect: " + response.cause().getMessage());
+
+                    promise.fail(response.cause());
+                }
+            });
+        }
+
+        catch (Exception exception)
+        {
+            System.err.println("Failed to initialize mongo client. " + exception);
+        }
 
         return promise.future();
     }

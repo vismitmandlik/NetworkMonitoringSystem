@@ -14,15 +14,23 @@ public class Auth {
     /* takes jwt configs from config.json and creates token using it */
     public static void initialize(Vertx vertx, JsonObject config)
     {
-        if (JWT_AUTH == null)
+        try
         {
-            synchronized (Auth.class)
+            if (JWT_AUTH == null)
             {
-                var secretKey = config.getString("jwt_secret_key", "default_secret_key");
+                synchronized (Auth.class)
+                {
+                    var secretKey = config.getString("jwt_secret_key", "default_secret_key");
 
-                JWT_AUTH = JWTAuth.create(vertx, new JWTAuthOptions().addPubSecKey(new PubSecKeyOptions().setAlgorithm("HS256").setBuffer(secretKey)));
+                    JWT_AUTH = JWTAuth.create(vertx, new JWTAuthOptions().addPubSecKey(new PubSecKeyOptions().setAlgorithm("HS256").setBuffer(secretKey)));
+                }
             }
         }
+        catch (Exception exception)
+        {
+            System.err.println("Failed to initialize jwt auth token. " + exception);
+        }
+
     }
 
     // Getter to return the jwtAuth instance

@@ -20,21 +20,31 @@ public class User
 
         var query = new JsonObject().put("username", username);
 
-        // Check if user already exists
-        Operations.findOne(Constants.USERS_COLLECTION, query).onSuccess(existingUser ->
+        try
         {
-            if (existingUser != null)
+            // Check if user already exists
+            Operations.findOne(Constants.USERS_COLLECTION, query).onSuccess(existingUser ->
             {
-                context.response().setStatusCode(400).end("User already exists.");
-            }
-            else
-            {
-                var newUser = new JsonObject().put("username", username).put("password", password);
+                if (existingUser != null)
+                {
+                    context.response().setStatusCode(400).end("User already exists.");
+                }
 
-                // Insert new user
-                Operations.insert(Constants.USERS_COLLECTION, newUser).onSuccess(id -> context.response().setStatusCode(201).end("User registered successfully.")).onFailure(err -> context.response().setStatusCode(500).end("Error registering user."));
-            }
-        }).onFailure(error -> context.response().setStatusCode(500).end("Error checking user existence." + error));
+                else
+                {
+                    var newUser = new JsonObject().put("username", username).put("password", password);
+
+                    // Insert new user
+                    Operations.insert(Constants.USERS_COLLECTION, newUser).onSuccess(id -> context.response().setStatusCode(201).end("User registered successfully.")).onFailure(err -> context.response().setStatusCode(500).end("Error registering user."));
+                }
+
+            }).onFailure(error -> context.response().setStatusCode(500).end("Error checking user existence." + error));
+        }
+
+        catch (Exception exception)
+        {
+            System.err.println("Failed to register user. " + exception);
+        }
     }
 
     // User login and JWT token generation
@@ -48,28 +58,50 @@ public class User
 
         var query = new JsonObject().put("username", username);
 
-        // Find user by username
-        Operations.findOne(Constants.USERS_COLLECTION, query).onSuccess(user ->
+        try
         {
-            if (user != null)
+            // Find user by username
+            Operations.findOne(Constants.USERS_COLLECTION, query).onComplete(asyncResult ->
             {
-                if (user.getString("password").equals(password))
+                if (asyncResult.succeeded())
                 {
-                    var jwtOptions = new JWTOptions().setExpiresInSeconds(3600);
+                    var user = asyncResult.result();
 
-                    var token = Auth.jwtAuth().generateToken(new JsonObject().put("username", username), jwtOptions);
+                    if (user != null)
+                    {
+                        if (user.getString("password").equals(password))
+                        {
+                            var jwtOptions = new JWTOptions().setExpiresInSeconds(3600);
 
-                    context.response().putHeader("Content-Type", "application/json").end(new JsonObject().put("token", token).encode());
+                            var token = Auth.jwtAuth().generateToken(new JsonObject().put("username", username), jwtOptions);
+
+                            context.response().putHeader("Content-Type", "application/json")
+                                    .end(new JsonObject().put("token", token).encode());
+                        }
+
+                        else
+                        {
+                            context.response().setStatusCode(401).end("Invalid password");
+                        }
+                    }
+
+                    else
+                    {
+                        context.response().setStatusCode(404).end("User not found");
+                    }
                 }
+
                 else
                 {
-                    context.response().setStatusCode(401).end("Invalid password");
+                    context.response().setStatusCode(500).end("Error checking user credentials. " + asyncResult.cause());
                 }
-            }
-            else
-            {
-                context.response().setStatusCode(404).end("User not found");
-            }
-        }).onFailure(error -> context.response().setStatusCode(500).end("Error checking user credentials." + error));
+            });
+
+        }
+
+        catch (Exception exception)
+        {
+            System.err.println("Failed to login. " + exception);
+        }
     }
 }

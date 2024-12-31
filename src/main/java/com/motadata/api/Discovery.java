@@ -6,6 +6,8 @@ import io.vertx.ext.web.Router;
 
 public class Discovery
 {
+    private static  final String ERROR  = "error";
+
     public static void init(Router router)
     {
         router.post("/").handler(context -> context.vertx().eventBus().request(Constants.DISCOVERY_VERTICLE, context.body().asJsonObject(), reply ->
@@ -16,7 +18,7 @@ public class Discovery
                     }
                     else
                     {
-                        context.response().setStatusCode(500).end(new JsonObject().put("error", "Failed to start discovery").encodePrettily());
+                        context.response().setStatusCode(500).end(new JsonObject().put(ERROR, "Failed to start discovery").encodePrettily());
                     }
                 }));
     }

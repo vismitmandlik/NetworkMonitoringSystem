@@ -17,4 +17,8 @@ public class Constants
     public static final String OBJECTS_COLLECTION = "objects";
 
     public static final String POLLER_RESULTS_COLLECTION = "poller_results";
+
+    public static final String PROVISION_VERTICLE = "provision.verticle";
+
+    public static final String POLLER_VERTICLE = "poller.verticle";
 }

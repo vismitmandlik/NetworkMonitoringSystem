@@ -1,6 +1,7 @@
 package com.motadata.services;
 
 import com.motadata.Main;
+import io.vertx.core.AbstractVerticle;
 import io.vertx.core.json.JsonArray;
 
 import java.io.BufferedReader;
@@ -10,9 +11,9 @@ import java.util.concurrent.TimeUnit;
 
 import static com.motadata.services.ObjectManager.storePollerResults;
 
-public class Poller
+public class Poller extends AbstractVerticle
 {
-    public static void pollDevice(JsonArray device, String event)
+    public static void poll(JsonArray device, String event)
     {
         Main.vertx().executeBlocking(()  ->
         {

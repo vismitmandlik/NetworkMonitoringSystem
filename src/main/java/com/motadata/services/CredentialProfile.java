@@ -41,27 +41,39 @@ public class CredentialProfile
                 }
             }).onFailure(err -> context.response().setStatusCode(500).end("Error checking for existing credentials: " + err.getMessage()));
         }
+
         catch (Exception exception)
         {
-
+            System.err.println("Failed to save credentials. " + exception);
         }
 
     }
 
     public static void getAllCredentials(RoutingContext context)
     {
-        // Retrieve all credentials from the database without any query
-        Operations.findAll(Constants.CREDENTIALS_COLLECTION, new JsonObject()).onSuccess(credentials ->
+        try
         {
-            if (credentials != null && !credentials.isEmpty())
+            // Retrieve all credentials from the database without any query
+            Operations.findAll(Constants.CREDENTIALS_COLLECTION, new JsonObject()).onSuccess(credentials ->
             {
-                context.response().putHeader("Content-Type", "application/json").end(new JsonArray(credentials).encode());
-            }
-            else
-            {
-                context.response().setStatusCode(404).end("No credentials found.");
-            }
-        }).onFailure(err -> context.response().setStatusCode(500).end("Error retrieving credentials: " + err.getMessage()));
+                if (credentials != null && !credentials.isEmpty())
+                {
+                    context.response().putHeader("Content-Type", "application/json").end(new JsonArray(credentials).encode());
+                }
+
+                else
+                {
+                    context.response().setStatusCode(404).end("No credentials found.");
+                }
+
+            }).onFailure(err -> context.response().setStatusCode(500).end("Error retrieving credentials: " + err.getMessage()));
+        }
+
+        catch (Exception exception)
+        {
+            System.err.println("Failed to get credentials from database. " + exception);
+        }
+
     }
 
     // Method to find credentials by device ID
@@ -75,19 +87,30 @@ public class CredentialProfile
 
             return;
         }
+
         var query = new JsonObject().put("name", name);
 
-        // Find credentials in the database
-        Operations.findOne(Constants.CREDENTIALS_COLLECTION, query).onSuccess(credential ->
+        try
         {
-            if (credential != null)
+            // Find credentials in the database
+            Operations.findOne(Constants.CREDENTIALS_COLLECTION, query).onComplete(result ->
             {
-                context.response().putHeader("Content-Type", "application/json").end(credential.encode());
-            }
-            else
-            {
-                context.response().setStatusCode(404).end("Credential not found.");
-            }
-        }).onFailure(err -> context.response().setStatusCode(500).end("Error retrieving credential: " + err.getMessage()));
+                if (result.succeeded())
+                {
+                    context.response().putHeader("Content-Type", "application/json").end(result.result().encode());
+                }
+
+                else
+                {
+                    context.response().setStatusCode(404).end("Credential not found.");
+                }
+            });
+        }
+
+        catch (Exception exception)
+        {
+            System.err.println("Failed to find credentials. " + exception);
+        }
+
     }
 }

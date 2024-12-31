@@ -3,6 +3,7 @@ package com.motadata.utils;
 import com.motadata.Main;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
+import io.vertx.core.json.JsonObject;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -128,5 +129,58 @@ public class Utils
         }
 
         return promise.future();
+    }
+
+    public static JsonObject parsePollerResult(String pollerResult)
+    {
+        try
+        {
+            var result = new JsonObject(pollerResult);
+
+            var deviceId = result.getString("deviceId");
+
+            if (deviceId == null || deviceId.isEmpty())
+
+            {
+                System.err.println("DeviceId is null or empty in result: " + result);
+
+                return null;
+            }
+
+            return new JsonObject()
+                    .put("deviceId", deviceId)
+                    .put("ip", result.getString("ip"))
+                    .put("cpuUsage", parseDouble(result.getString("cpuUsage")))
+                    .put("memoryUsage", parseDouble(result.getString("memoryUsage")))
+                    .put("diskUsage", parseDouble(result.getString("diskUsage").replace("%", "")));
+        }
+        catch (Exception exception)
+        {
+            System.err.println("Failed to parse poller result: " + pollerResult + exception);
+
+            return null;
+        }
+    }
+
+    private static double parseDouble(String value)
+    {
+        try
+        {
+            return Double.parseDouble(value);
+        }
+        catch (NumberFormatException exception)
+        {
+            return 0.0;
+        }
+    }
+
+    public static String errorResponse(String message)
+    {
+        return new JsonObject().put("error", message).toString();
+    }
+
+    public static String successResponse()
+    {
+        return new JsonObject().put("message", "Polling tasks started for provisioned devices").toString();
     }
 }

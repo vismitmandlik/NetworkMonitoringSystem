@@ -8,7 +8,5 @@ public class Object
     public static void init(Router router)
     {
         router.post("/provision").handler(ObjectManager::provisionDevices);
-
-        router.post("/poll").handler(ObjectManager::provisionDevices);
     }
 }
