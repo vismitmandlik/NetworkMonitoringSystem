@@ -24,13 +24,23 @@ public class Constants
 
     public static final String ERROR = "error";
 
+    public static final String STATUS = "status";
+
     public static final int SC_404 = 404;
 
     public static final int SC_500 = 500;
 
     public static final int SC_200 = 200;
 
+    public static final int SC_400 = 400;
+
     public static final String CONTENT_TYPE = "Content-Type";
 
     public static final String APPLICATION_JSON = "application/json";
+
+    public static final String PORT = "port";
+
+    public static final String IP = "ip";
+
+    public static final String ID = "_id";
 }

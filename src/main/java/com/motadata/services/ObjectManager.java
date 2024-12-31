@@ -7,15 +7,13 @@ import com.motadata.utils.Utils;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
+import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.RoutingContext;
 
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
-
-import static com.motadata.services.Poller.poll;
 
 public class ObjectManager extends AbstractVerticle
 {
@@ -23,79 +21,97 @@ public class ObjectManager extends AbstractVerticle
 
     private static final int BATCH_SIZE = 25;
 
+    public static final String OBJECT_IDS= "objectIds";
+
+    public static final String POLL_INTERVAL= "pollInterval";
+
+    public static final String EVENT = "event";
+
+    public static final String DEVICES = "devices";
+
+    public static final String TIMESTAMP = "timestamp";
+
     private static final Queue<JsonObject> deviceQueue = new ConcurrentLinkedQueue<>();
 
     @Override
     public void start()
     {
-        vertx.eventBus().localConsumer(Constants.PROVISION_VERTICLE);
+        vertx.eventBus().localConsumer(Constants.PROVISION_VERTICLE, this::provisionDevices);
     }
 
-    public void provisionDevices(RoutingContext context)
+    public void provisionDevices(Message<Object> message)
     {
-        var requestBody = context.body().asJsonObject();
+        var requestBody = (JsonObject) message.body();
 
         if (!isValidRequest(requestBody))
         {
-            context.response().setStatusCode(400).end(Utils.errorResponse("Invalid request: 'objectIds' or 'pollInterval' is missing"));
+            message.fail(Constants.SC_400, "Invalid request: 'objectIds' or 'pollInterval' is missing");
 
             return;
         }
 
-        var deviceIds = requestBody.getJsonArray("objectIds");
+        var deviceIds = requestBody.getJsonArray(OBJECT_IDS);
 
-        var pollInterval = requestBody.getInteger("pollInterval");
+        var pollInterval = requestBody.getInteger(POLL_INTERVAL);
 
-        var event = requestBody.getString("event");
+        var event = requestBody.getString(EVENT);
 
         try
         {
-            fetchDeviceDetails(deviceIds).onSuccess(devices ->
+            fetchDeviceDetails(deviceIds).onComplete(result ->
             {
-                // Use splitIntoBatches to split the devices into manageable batches
-//            List<JsonArray> deviceBatches = splitIntoBatches(devices);
-
-                for (var device : devices)
+                if(result.succeeded())
                 {
-                    var ip = device.getString("ip");
-
-                    var port = device.getInteger("port");
-
-                    checkDeviceAvailability(ip, port).onSuccess(isAvailable ->
+                    for (var item : result.result())
                     {
-                        if (isAvailable)
+                        var ip = item.getString(Constants.IP);
+
+                        var port = item.getInteger(Constants.PORT);
+
+                        checkDeviceAvailability(ip, port).onComplete(asyncResult ->
                         {
-                            deviceQueue.add(device);
-                        }
-                    }).onFailure(err -> System.err.println("Device " + ip + " not available: " + err.getMessage()));
-                }
+                            if (asyncResult.succeeded())
+                            {
+                                deviceQueue.add(item);
+                            }
+                            else
+                            {
+                                System.err.println("Device " + ip + " not available: " + asyncResult.cause());
+                            }
+                        });
+                    }
 
-                // Start polling task for the first time, if not already started
-                if (TIMER_ID == -1)
-                {
-                    startPollingTask( event, pollInterval);
-                }
+                    // Start polling task for the first time, if not already started
+                    if (TIMER_ID == -1)
+                    {
+                        startPollingTask(event, pollInterval);
+                    }
 
+                    else
+                    {
+                        System.out.println("Polling is already active.");
+                    }
+
+                    message.reply(Utils.successResponse());
+                }
                 else
                 {
-                    System.out.println("Polling is already active.");
+                    message.fail(Constants.SC_500, result.cause().toString());
                 }
 
-                context.response().setStatusCode(200).end(Utils.successResponse());
-
-            }).onFailure(err -> context.response().setStatusCode(500).end(Utils.errorResponse(err.getMessage())));
+            });
         }
 
         catch (Exception exception)
         {
-            System.err.println("Failed to provision device. " + exception);
+            message.fail(Constants.SC_500, "Failed to provision device: " + exception.getMessage());
         }
 
     }
 
     private boolean isValidRequest(JsonObject requestBody)
     {
-        return requestBody != null && requestBody.containsKey("objectIds") && requestBody.containsKey("pollInterval");
+        return requestBody != null && requestBody.containsKey(OBJECT_IDS) && requestBody.containsKey("pollInterval");
     }
 
     private void startPollingTask(String event, int pollInterval)
@@ -117,14 +133,13 @@ public class ObjectManager extends AbstractVerticle
 
                     // Use a fixed thread pool to poll devices concurrently
                     Main.vertx().eventBus().request(Constants.POLLER_VERTICLE,  new JsonObject()
-                            .put("devices", batch)
-                            .put("event", event), result ->
+                            .put(DEVICES, batch)
+                            .put(EVENT, event), result ->
                     {
                         if (result.succeeded())
                         {
                             System.out.println("Polling initiated successfully for the batch.");
                         }
-
                         else
                         {
                             System.err.println("Failed to initiate polling: " + result.cause().getMessage());
@@ -146,7 +161,7 @@ public class ObjectManager extends AbstractVerticle
 
         try
         {
-            Operations.findAll(Constants.OBJECTS_COLLECTION, new JsonObject().put("_id", new JsonObject().put("$in", deviceIds))).onComplete(result ->
+            Operations.findAll(Constants.OBJECTS_COLLECTION, new JsonObject().put(Constants.ID, new JsonObject().put("$in", deviceIds))).onComplete(result ->
             {
                 if (result.failed())
                 {
@@ -180,7 +195,7 @@ public class ObjectManager extends AbstractVerticle
 
                 if (result != null)
                 {
-                    result.put("timestamp", timestamp);
+                    result.put(TIMESTAMP, timestamp);
 
                     Operations.insert(Constants.POLLER_RESULTS_COLLECTION, result).onComplete(asyncResult ->
                     {

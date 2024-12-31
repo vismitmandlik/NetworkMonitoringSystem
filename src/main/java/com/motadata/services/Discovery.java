@@ -12,13 +12,22 @@ import io.vertx.core.json.JsonObject;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Discovery extends AbstractVerticle
 {
+    public static final String CREDENTIALS = "credentials";
+
+    public static final String SUCCESS = "success";
+
+    public static final String FAILED = "failed";
+
+    public static final String REASON = "reason";
+
+    public static final String GO_EXECUTABLE_DIRECTORY = "goExecutableDirectory";
+
     @Override
     public void start()
     {
@@ -31,9 +40,9 @@ public class Discovery extends AbstractVerticle
         {
             var requestBody = (JsonObject) message.body();
 
-            var ipRange = requestBody.getString("ip");
+            var ipRange = requestBody.getString(Constants.IP);
 
-            var port = requestBody.getInteger("port");
+            var port = requestBody.getInteger(Constants.PORT);
 
             var credentialsIds = requestBody.getJsonArray("credentialsIds");
 
@@ -41,12 +50,12 @@ public class Discovery extends AbstractVerticle
 
             var credentialsList = extractCredentials(credentialsIds);
 
-            message.reply(new JsonObject().put("status", "Discovery started"));
+            message.reply(new JsonObject().put(Constants.STATUS, "Discovery started"));
 
             for (var ip : ips)
             {
                 // Create a result object for this IP
-                var result = new JsonObject().put("ip", ip);
+                var result = new JsonObject().put(Constants.IP, ip);
 
                 var future = Utils.ping(ip).compose(isReachable ->
                 {
@@ -56,7 +65,7 @@ public class Discovery extends AbstractVerticle
                         {
                             if (isOpen)
                             {
-                                var ipCredentialObject = new JsonObject().put("ip", ip).put("port", port).put("credentials", new JsonArray(credentialsList));
+                                var ipCredentialObject = new JsonObject().put(Constants.IP, ip).put(Constants.PORT, port).put(CREDENTIALS, new JsonArray(credentialsList));
 
                                 // Spawn Go process with IP
                                 return spawnGoProcess(ipCredentialObject).map(successCredential ->
@@ -64,14 +73,14 @@ public class Discovery extends AbstractVerticle
                                     if (successCredential != null)
                                     {
                                         // If SSH succeeded and returned a credential
-                                        result.put("status", "success");
+                                        result.put(Constants.STATUS, SUCCESS);
 
                                         storeData(ip, port, successCredential);
                                     }
 
                                     else
                                     {
-                                        result.put("status", "failed").put("reason", "SSH failed");
+                                        result.put(Constants.STATUS, FAILED).put(REASON, "SSH failed");
                                     }
 
                                     return result;
@@ -80,7 +89,7 @@ public class Discovery extends AbstractVerticle
 
                             else
                             {
-                                result.put("status", "failed").put("reason", "Port not open");
+                                result.put(Constants.STATUS, FAILED).put(REASON, "Port not open");
 
                                 return Future.succeededFuture(result);
                             }
@@ -89,12 +98,12 @@ public class Discovery extends AbstractVerticle
 
                     else
                     {
-                        result.put("status", "failed").put("reason", "IP not reachable");
+                        result.put(Constants.STATUS, FAILED).put(REASON, "IP not reachable");
 
                         return Future.succeededFuture(result);
                     }
 
-                }).onFailure(err -> result.put("status", "failed").put("reason", err.getMessage()));
+                }).onFailure(err -> result.put(Constants.STATUS, FAILED).put(REASON, err.getMessage()));
 
                 future.onComplete(AsyncResult ->
                 {
@@ -122,7 +131,7 @@ public class Discovery extends AbstractVerticle
         // Simulate fetching a credential from the database based on the ID
         var promise = Promise.<JsonObject>promise();
 
-        var query = new JsonObject().put("_id", credentialsId);
+        var query = new JsonObject().put(Constants.ID, credentialsId);
 
         try
         {
@@ -212,14 +221,14 @@ public class Discovery extends AbstractVerticle
 
             try
             {
-                var goExecutable = vertx.getOrCreateContext().config().getString("goExecutablePath");
+                var goExecutable = vertx.getOrCreateContext().config().getString(GO_EXECUTABLE_DIRECTORY);
 
                 if (goExecutable == null || goExecutable.isEmpty())
                 {
                     throw new Exception("goExecutablePath is not set in the configuration.");
                 }
 
-                var processBuilder = new ProcessBuilder(goExecutable, Constants.DISCOVERY_EVENT, ipCredentialObject.encode()).directory(new File("/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd/"));
+                var processBuilder = new ProcessBuilder(goExecutable, Constants.DISCOVERY_EVENT, ipCredentialObject.encode()).directory(new File(config().getString(GO_EXECUTABLE_DIRECTORY)));
 
                 process = processBuilder.start();
 
@@ -263,7 +272,7 @@ public class Discovery extends AbstractVerticle
                     System.err.println(errorMessage);
 
                 }
-                
+
                 return result;
 
             }
@@ -284,9 +293,9 @@ public class Discovery extends AbstractVerticle
                         reader.close();
                     }
 
-                    catch (IOException e)
+                    catch (Exception exception)
                     {
-                        System.err.println("Failed to close reader: " + e.getMessage());
+                        System.err.println("Failed to close reader: " + exception.getMessage());
                     }
                 }
 
@@ -301,7 +310,7 @@ public class Discovery extends AbstractVerticle
     private void storeData(String ip, int port, JsonObject credential)
     {
         // Query to check for duplicates
-        var query = new JsonObject().put("ip", ip);
+        var query = new JsonObject().put(Constants.IP, ip);
 
         try
         {
@@ -313,7 +322,7 @@ public class Discovery extends AbstractVerticle
                     if (result == null)
                     {
                         // No duplicate found, insert the new data
-                        var discoveryData = new JsonObject().put("ip", ip).put("credentials", credential).put("port", port);
+                        var discoveryData = new JsonObject().put(Constants.IP, ip).put(CREDENTIALS, credential).put(Constants.PORT, port);
 
                         Operations.insert(Constants.OBJECTS_COLLECTION, discoveryData).onComplete(asyncResult ->
                         {
