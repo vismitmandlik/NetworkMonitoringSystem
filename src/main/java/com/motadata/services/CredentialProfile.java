@@ -8,43 +8,61 @@ import io.vertx.ext.web.RoutingContext;
 
 public class CredentialProfile
 {
+    public static final String NAME = "name";
+
+    public static final String USERNAME = "username";
+
+    public static final String PASSWORD = "password";
+
     // Method to save device credentials
     public static void saveCredentials(RoutingContext context)
     {
         var requestBody = context.body().asJsonObject();
 
-        var name = requestBody.getString("name");
+        var name = requestBody.getString(NAME);
 
-        var username = requestBody.getString("username");
+        var username = requestBody.getString(USERNAME);
 
-        var password = requestBody.getString("password");
+        var password = requestBody.getString(PASSWORD);
 
         // Create a new credential object
-        var newCredential = new JsonObject().put("name", name).put("username", username).put("password", password);
+        var newCredential = new JsonObject().put(NAME, name).put(USERNAME, username).put(PASSWORD, password);
 
         // Check if the name already exists in the database
-        var query = new JsonObject().put("name", name);
+        var query = new JsonObject().put(NAME, name);
 
         try
         {
-            Operations.findOne(Constants.CREDENTIALS_COLLECTION, query).onSuccess(existingCredential ->
+            Operations.findOne(Constants.CREDENTIALS_COLLECTION, query).onComplete(result ->
             {
-                if (existingCredential != null)
+                if (result.succeeded())
                 {
                     // Device ID already exists, respond with an error
-                    context.response().setStatusCode(400).end("Credential for this cred name : "+name+" already exists.");
+                    context.response().setStatusCode(Constants.SC_404).end("Credential for this cred name : " + name + " already exists.");
                 }
                 else
                 {
                     // Insert new credential into the database
-                    Operations.insert(Constants.CREDENTIALS_COLLECTION, newCredential).onSuccess(id -> context.response().setStatusCode(201).end("Credential saved successfully.")).onFailure(err -> context.response().setStatusCode(500).end("Error saving credential: " + err.getMessage()));
+                    Operations.insert(Constants.CREDENTIALS_COLLECTION, newCredential).onComplete(asyncResult ->
+                    {
+                        if (asyncResult.succeeded())
+                        {
+                            context.response().setStatusCode(Constants.SC_200).end("Credential saved successfully.");
+                        }
+                        else
+                        {
+                            context.response().setStatusCode(Constants.SC_500).end("Error saving credential: " + asyncResult.cause());
+                        }
+                    });
                 }
-            }).onFailure(err -> context.response().setStatusCode(500).end("Error checking for existing credentials: " + err.getMessage()));
+            });
         }
 
         catch (Exception exception)
         {
             System.err.println("Failed to save credentials. " + exception);
+
+            context.response().setStatusCode(Constants.SC_500).end("Error checking for existing credentials: " + exception);
         }
 
     }
@@ -54,24 +72,26 @@ public class CredentialProfile
         try
         {
             // Retrieve all credentials from the database without any query
-            Operations.findAll(Constants.CREDENTIALS_COLLECTION, new JsonObject()).onSuccess(credentials ->
+            Operations.findAll(Constants.CREDENTIALS_COLLECTION, new JsonObject()).onComplete(asyncResult ->
             {
-                if (credentials != null && !credentials.isEmpty())
+                if (asyncResult.succeeded())
                 {
-                    context.response().putHeader("Content-Type", "application/json").end(new JsonArray(credentials).encode());
+                    context.response().putHeader(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON).end(new JsonArray(asyncResult.result()).encode());
                 }
 
                 else
                 {
-                    context.response().setStatusCode(404).end("No credentials found.");
+                    context.response().setStatusCode(Constants.SC_404).end("No credentials found.");
                 }
 
-            }).onFailure(err -> context.response().setStatusCode(500).end("Error retrieving credentials: " + err.getMessage()));
+            });
         }
 
         catch (Exception exception)
         {
             System.err.println("Failed to get credentials from database. " + exception);
+
+            context.response().setStatusCode(Constants.SC_500).end("Error retrieving credentials: ");
         }
 
     }
@@ -79,16 +99,16 @@ public class CredentialProfile
     // Method to find credentials by device ID
     public static void findCredentials(RoutingContext context)
     {
-        var name = context.request().getParam("name");
+        var name = context.request().getParam(NAME);
 
         if (name == null || name.isEmpty())
         {
-            context.response().setStatusCode(400).end("Invalid request: 'name' is missing");
+            context.response().setStatusCode(Constants.SC_404).end("Invalid request: 'name' is missing");
 
             return;
         }
 
-        var query = new JsonObject().put("name", name);
+        var query = new JsonObject().put(NAME, name);
 
         try
         {
@@ -97,12 +117,12 @@ public class CredentialProfile
             {
                 if (result.succeeded())
                 {
-                    context.response().putHeader("Content-Type", "application/json").end(result.result().encode());
+                    context.response().putHeader(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON).end(result.result().encode());
                 }
 
                 else
                 {
-                    context.response().setStatusCode(404).end("Credential not found.");
+                    context.response().setStatusCode(Constants.SC_404).end("Credential not found.");
                 }
             });
         }
@@ -110,6 +130,8 @@ public class CredentialProfile
         catch (Exception exception)
         {
             System.err.println("Failed to find credentials. " + exception);
+
+            context.response().setStatusCode(Constants.SC_500).end("error in finding credentials.");
         }
 
     }
