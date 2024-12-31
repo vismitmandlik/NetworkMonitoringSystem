@@ -26,8 +26,6 @@ public class Discovery extends AbstractVerticle
 
     public static final String REASON = "reason";
 
-    public static final String GO_EXECUTABLE_DIRECTORY = "goExecutableDirectory";
-
     @Override
     public void start()
     {
@@ -221,14 +219,14 @@ public class Discovery extends AbstractVerticle
 
             try
             {
-                var goExecutable = vertx.getOrCreateContext().config().getString(GO_EXECUTABLE_DIRECTORY);
+                var goExecutable = vertx.getOrCreateContext().config().getString(Constants.GO_EXECUTABLE_DIRECTORY);
 
                 if (goExecutable == null || goExecutable.isEmpty())
                 {
                     throw new Exception("goExecutablePath is not set in the configuration.");
                 }
 
-                var processBuilder = new ProcessBuilder(goExecutable, Constants.DISCOVERY_EVENT, ipCredentialObject.encode()).directory(new File(config().getString(GO_EXECUTABLE_DIRECTORY)));
+                var processBuilder = new ProcessBuilder(goExecutable, Constants.DISCOVERY_EVENT, ipCredentialObject.encode()).directory(new File(config().getString(Constants.GO_EXECUTABLE_DIRECTORY)));
 
                 process = processBuilder.start();
 

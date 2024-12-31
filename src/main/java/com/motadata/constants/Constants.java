@@ -6,6 +6,8 @@ public class Constants
 
     public static final String DB_NAME = "nms_db";
 
+//    public static final int JWT_EXPIRY_TIME_IN_SECONDS = 3600;
+
     public static final String DISCOVERY_VERTICLE = "discovery.verticle";
 
     public static final String PROVISION_VERTICLE = "provision.verticle";
@@ -26,13 +28,17 @@ public class Constants
 
     public static final String STATUS = "status";
 
+    public static final int SC_200 = 200;
+
+    public static final int SC_201 = 201;
+
+    public static final int SC_400 = 400;
+
+    public static final int SC_401 = 401 ;
+
     public static final int SC_404 = 404;
 
     public static final int SC_500 = 500;
-
-    public static final int SC_200 = 200;
-
-    public static final int SC_400 = 400;
 
     public static final String CONTENT_TYPE = "Content-Type";
 
@@ -43,4 +49,14 @@ public class Constants
     public static final String IP = "ip";
 
     public static final String ID = "_id";
+
+    public static final String GO_EXECUTABLE_DIRECTORY = "goExecutableDirectory";
+
+    public static final String GO_EXECUTABLE_PATH= "goExecutablePath";
+
+    public static final String NAME = "name";
+
+    public static final String USERNAME = "username";
+
+    public static final String PASSWORD = "password";
 }

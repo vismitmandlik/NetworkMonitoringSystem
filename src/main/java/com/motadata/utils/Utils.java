@@ -1,6 +1,7 @@
 package com.motadata.utils;
 
 import com.motadata.Main;
+import com.motadata.services.ObjectManager;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.json.JsonObject;
@@ -182,5 +183,10 @@ public class Utils
     public static String successResponse()
     {
         return new JsonObject().put("message", "Polling tasks started for provisioned devices").toString();
+    }
+
+    public static boolean isValidRequest(JsonObject requestBody)
+    {
+        return requestBody != null && requestBody.containsKey(ObjectManager.OBJECT_IDS) && requestBody.containsKey(ObjectManager.POLL_INTERVAL);
     }
 }

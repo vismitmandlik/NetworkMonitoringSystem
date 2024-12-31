@@ -8,5 +8,6 @@
   "port": 8080,
   "pollerTimeout": 60,
   "minMongodbPoolSize": 3,
-  "maxMongodbPoolSize": 10
+  "maxMongodbPoolSize": 10,
+  "jwtExpiryTimeInSeconds": 3600
 }

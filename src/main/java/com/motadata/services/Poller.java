@@ -10,7 +10,7 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.util.concurrent.TimeUnit;
 
-import static com.motadata.services.ObjectManager.storePollerResults;
+import static com.motadata.services.ObjectManager.store;
 
 public class Poller extends AbstractVerticle
 {
@@ -18,7 +18,6 @@ public class Poller extends AbstractVerticle
     {
         vertx.eventBus().localConsumer(Constants.POLLER_VERTICLE);
     }
-
 
     public static void poll(JsonArray device, String event)
     {
@@ -37,7 +36,7 @@ public class Poller extends AbstractVerticle
 
                 var devicesJsonString = new JsonArray().add(device).encode();
 
-                var goExecutable = Main.vertx().getOrCreateContext().config().getString("goExecutablePath");
+                var goExecutable = Main.vertx().getOrCreateContext().config().getString(Constants.GO_EXECUTABLE_PATH);
 
                 // Check if goExecutable is null
                 if (goExecutable == null)
@@ -70,7 +69,7 @@ public class Poller extends AbstractVerticle
                 {
                     System.out.println("Polling result for devices: "  + outputLines.encodePrettily());
 
-                    storePollerResults(outputLines);
+                    store(outputLines);
 
                     return true;
                 }

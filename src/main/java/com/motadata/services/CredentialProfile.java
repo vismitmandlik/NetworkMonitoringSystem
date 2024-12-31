@@ -8,28 +8,22 @@ import io.vertx.ext.web.RoutingContext;
 
 public class CredentialProfile
 {
-    public static final String NAME = "name";
-
-    public static final String USERNAME = "username";
-
-    public static final String PASSWORD = "password";
-
-    // Method to save device credentials
-    public static void saveCredentials(RoutingContext context)
+    // Saves device credentials
+    public static void save(RoutingContext context)
     {
         var requestBody = context.body().asJsonObject();
 
-        var name = requestBody.getString(NAME);
+        var name = requestBody.getString(Constants.NAME);
 
-        var username = requestBody.getString(USERNAME);
+        var username = requestBody.getString(Constants.USERNAME);
 
-        var password = requestBody.getString(PASSWORD);
+        var password = requestBody.getString(Constants.PASSWORD);
 
         // Create a new credential object
-        var newCredential = new JsonObject().put(NAME, name).put(USERNAME, username).put(PASSWORD, password);
+        var newCredential = new JsonObject().put(Constants.NAME, name).put(Constants.USERNAME, username).put(Constants.PASSWORD, password);
 
         // Check if the name already exists in the database
-        var query = new JsonObject().put(NAME, name);
+        var query = new JsonObject().put(Constants.NAME, name);
 
         try
         {
@@ -67,7 +61,8 @@ public class CredentialProfile
 
     }
 
-    public static void getAllCredentials(RoutingContext context)
+    // Gets all the credentials from database
+    public static void getAll(RoutingContext context)
     {
         try
         {
@@ -96,10 +91,10 @@ public class CredentialProfile
 
     }
 
-    // Method to find credentials by device ID
-    public static void findCredentials(RoutingContext context)
+    // Finds credentials by device-id
+    public static void find(RoutingContext context)
     {
-        var name = context.request().getParam(NAME);
+        var name = context.request().getParam(Constants.NAME);
 
         if (name == null || name.isEmpty())
         {
@@ -108,7 +103,7 @@ public class CredentialProfile
             return;
         }
 
-        var query = new JsonObject().put(NAME, name);
+        var query = new JsonObject().put(Constants.NAME, name);
 
         try
         {

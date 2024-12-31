@@ -1,5 +1,6 @@
 package com.motadata.services;
 
+import com.motadata.Main;
 import com.motadata.configs.Auth;
 import com.motadata.constants.Constants;
 import com.motadata.db.Operations;
@@ -9,36 +10,49 @@ import io.vertx.ext.web.RoutingContext;
 
 public class User
 {
+    public static final String TOKEN = "token";
+
+    public static final String JWT_EXPIRY_TIME_IN_SECONDS = "jwtExpiryTimeInSeconds";
+
     // Register a new user
     public static void register(RoutingContext context)
     {
         var requestBody = context.body().asJsonObject();
 
-        var username = requestBody.getString("username");
+        var username = requestBody.getString(Constants.USERNAME);
 
-        var password = requestBody.getString("password");
+        var password = requestBody.getString(Constants.PASSWORD);
 
-        var query = new JsonObject().put("username", username);
+        var query = new JsonObject().put(Constants.USERNAME, username);
 
         try
         {
             // Check if user already exists
-            Operations.findOne(Constants.USERS_COLLECTION, query).onSuccess(existingUser ->
+            Operations.findOne(Constants.USERS_COLLECTION, query).onComplete(result ->
             {
-                if (existingUser != null)
+                if (result.succeeded())
                 {
-                    context.response().setStatusCode(400).end("User already exists.");
+                    context.response().setStatusCode(Constants.SC_400).end("User already exists.");
                 }
-
                 else
                 {
-                    var newUser = new JsonObject().put("username", username).put("password", password);
+                    var newUser = new JsonObject().put(Constants.USERNAME, username).put(Constants.PASSWORD, password);
 
                     // Insert new user
-                    Operations.insert(Constants.USERS_COLLECTION, newUser).onSuccess(id -> context.response().setStatusCode(201).end("User registered successfully.")).onFailure(err -> context.response().setStatusCode(500).end("Error registering user."));
+                    Operations.insert(Constants.USERS_COLLECTION, newUser).onComplete(asyncResult ->
+                    {
+                        if (asyncResult.succeeded())
+                        {
+                            context.response().setStatusCode(Constants.SC_201).end("User registered successfully.");
+                        }
+                        else
+                        {
+                            context.response().setStatusCode(Constants.SC_500).end("Error registering user.");
+                        }
+                    });
                 }
 
-            }).onFailure(error -> context.response().setStatusCode(500).end("Error checking user existence." + error));
+            }).onFailure(error -> context.response().setStatusCode(Constants.SC_500).end("Error checking user existence." + error));
         }
 
         catch (Exception exception)
@@ -52,11 +66,11 @@ public class User
     {
         var requestBody = context.body().asJsonObject();
 
-        var username = requestBody.getString("username");
+        var username = requestBody.getString(Constants.USERNAME);
 
-        var password = requestBody.getString("password");
+        var password = requestBody.getString(Constants.PASSWORD);
 
-        var query = new JsonObject().put("username", username);
+        var query = new JsonObject().put(Constants.USERNAME, username);
 
         try
         {
@@ -69,31 +83,30 @@ public class User
 
                     if (user != null)
                     {
-                        if (user.getString("password").equals(password))
+                        if (user.getString(Constants.PASSWORD).equals(password))
                         {
-                            var jwtOptions = new JWTOptions().setExpiresInSeconds(3600);
+                            var jwtOptions = new JWTOptions().setExpiresInSeconds(Main.vertx().getOrCreateContext().config().getInteger(JWT_EXPIRY_TIME_IN_SECONDS));
 
-                            var token = Auth.jwtAuth().generateToken(new JsonObject().put("username", username), jwtOptions);
+                            var token = Auth.jwtAuth().generateToken(new JsonObject().put(Constants.USERNAME, username), jwtOptions);
 
-                            context.response().putHeader("Content-Type", "application/json")
-                                    .end(new JsonObject().put("token", token).encode());
+                            context.response().putHeader(Constants.CONTENT_TYPE, Constants.APPLICATION_JSON).end(new JsonObject().put(TOKEN, token).encode());
                         }
 
                         else
                         {
-                            context.response().setStatusCode(401).end("Invalid password");
+                            context.response().setStatusCode(Constants.SC_401).end("Invalid password");
                         }
                     }
 
                     else
                     {
-                        context.response().setStatusCode(404).end("User not found");
+                        context.response().setStatusCode(Constants.SC_404).end("User not found");
                     }
                 }
 
                 else
                 {
-                    context.response().setStatusCode(500).end("Error checking user credentials. " + asyncResult.cause());
+                    context.response().setStatusCode(Constants.SC_500).end("Error checking user credentials. " + asyncResult.cause());
                 }
             });
 

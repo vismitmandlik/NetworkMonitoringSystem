@@ -21,9 +21,9 @@ public class ObjectManager extends AbstractVerticle
 
     private static final int BATCH_SIZE = 25;
 
-    public static final String OBJECT_IDS= "objectIds";
+    public static final String OBJECT_IDS = "objectIds";
 
-    public static final String POLL_INTERVAL= "pollInterval";
+    public static final String POLL_INTERVAL = "pollInterval";
 
     public static final String EVENT = "event";
 
@@ -34,16 +34,18 @@ public class ObjectManager extends AbstractVerticle
     private static final Queue<JsonObject> deviceQueue = new ConcurrentLinkedQueue<>();
 
     @Override
-    public void start()
+    public void start(Promise<Void> promise)
     {
-        vertx.eventBus().localConsumer(Constants.PROVISION_VERTICLE, this::provisionDevices);
+        vertx.eventBus().localConsumer(Constants.PROVISION_VERTICLE, this::provision);
+
+        promise.complete();
     }
 
-    public void provisionDevices(Message<Object> message)
+    public void provision(Message<Object> message)
     {
         var requestBody = (JsonObject) message.body();
 
-        if (!isValidRequest(requestBody))
+        if (!Utils.isValidRequest(requestBody))
         {
             message.fail(Constants.SC_400, "Invalid request: 'objectIds' or 'pollInterval' is missing");
 
@@ -58,7 +60,7 @@ public class ObjectManager extends AbstractVerticle
 
         try
         {
-            fetchDeviceDetails(deviceIds).onComplete(result ->
+            fetch(deviceIds).onComplete(result ->
             {
                 if(result.succeeded())
                 {
@@ -84,9 +86,8 @@ public class ObjectManager extends AbstractVerticle
                     // Start polling task for the first time, if not already started
                     if (TIMER_ID == -1)
                     {
-                        startPollingTask(event, pollInterval);
+                        send(event, pollInterval);
                     }
-
                     else
                     {
                         System.out.println("Polling is already active.");
@@ -106,15 +107,10 @@ public class ObjectManager extends AbstractVerticle
         {
             message.fail(Constants.SC_500, "Failed to provision device: " + exception.getMessage());
         }
-
     }
 
-    private boolean isValidRequest(JsonObject requestBody)
-    {
-        return requestBody != null && requestBody.containsKey(OBJECT_IDS) && requestBody.containsKey("pollInterval");
-    }
-
-    private void startPollingTask(String event, int pollInterval)
+    /* It sends devices in batches to poller verticle */
+    private void send(String event, int pollInterval)
     {
         System.out.println("Polling task started for device with interval " + pollInterval + " seconds.");
 
@@ -155,7 +151,8 @@ public class ObjectManager extends AbstractVerticle
         }
     }
 
-    public Future<List<JsonObject>> fetchDeviceDetails(JsonArray deviceIds)
+    /* It fetches device details using deviceId from the database */
+    public Future<List<JsonObject>> fetch(JsonArray deviceIds)
     {
         var promise = Promise.<List<JsonObject>>promise();
 
@@ -183,7 +180,8 @@ public class ObjectManager extends AbstractVerticle
         return promise.future();
     }
 
-    static void storePollerResults(JsonArray pollerResults)
+    /* It stores poller result into database */
+    static void store(JsonArray pollerResults)
     {
         var timestamp = System.currentTimeMillis();
 
@@ -221,7 +219,7 @@ public class ObjectManager extends AbstractVerticle
 
     }
 
-    // Checks if the device IP is reachable and if the port is open
+    /* Checks if the device IP is reachable and if the port is open */
     private Future<Boolean> checkDeviceAvailability(String ip, int port)
     {
         try
