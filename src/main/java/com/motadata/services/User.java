@@ -7,9 +7,13 @@ import com.motadata.db.Operations;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.auth.JWTOptions;
 import io.vertx.ext.web.RoutingContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class User
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(User.class);
+
     public static final String TOKEN = "token";
 
     public static final String JWT_EXPIRY_TIME_IN_SECONDS = "jwtExpiryTimeInSeconds";
@@ -57,7 +61,7 @@ public class User
 
         catch (Exception exception)
         {
-            System.err.println("Failed to register user. " + exception);
+            LOGGER.error("Failed to register user: {}", exception.getMessage());
         }
     }
 
@@ -114,7 +118,7 @@ public class User
 
         catch (Exception exception)
         {
-            System.err.println("Failed to login. " + exception);
+            LOGGER.error("Failed to login user: {}", exception.getMessage());
         }
     }
 }

@@ -1,18 +1,41 @@
 package com.motadata;
 
+import com.motadata.constants.Constants;
 import com.motadata.services.Discovery;
+import com.motadata.services.ObjectManager;
+import com.motadata.services.Poller;
 import io.vertx.config.ConfigRetriever;
 import io.vertx.config.ConfigStoreOptions;
 import io.vertx.core.*;
 import com.motadata.api.Server;
 import com.motadata.db.MongoClient;
-
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import io.vertx.core.eventbus.EventBusOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Main
 {
-    private static final Vertx vertx = Vertx.vertx(new VertxOptions().setWorkerPoolSize(4).setEventLoopPoolSize(Runtime.getRuntime().availableProcessors() * 2));
+    private static final int VERTX_WORKER_POOL_SIZE = 4;
+
+    private static final int EVENT_BUS_CONNECTION_TIMEOUT = 30000;
+
+    private static final int EVENT_BUS_IDLE_TIMEOUT = 120000;
+
+    private static final Vertx vertx = Vertx.vertx(new VertxOptions().setWorkerPoolSize(VERTX_WORKER_POOL_SIZE)
+            .setEventLoopPoolSize(Runtime.getRuntime().availableProcessors())
+            .setEventBusOptions(new EventBusOptions().setConnectTimeout(EVENT_BUS_CONNECTION_TIMEOUT).setIdleTimeout(EVENT_BUS_IDLE_TIMEOUT)));
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
+
+    private static final Object CONFIG_FILE_PATH = "src/main/resources/config.json";
+
+    private static final int DISCOVERY_VERTICLE_INSTANCES = 1;
+
+    private static final int SERVER_VERTICLE_INSTANCES = 2;
+
+    private static final int POLLER_VERTICLE_INSTANCES = 2;
+
+    private static final int OBJECT_MANAGER_VERTICLE_INSTANCES = 2;
 
     public static Vertx vertx()
     {
@@ -21,58 +44,63 @@ public class Main
 
     public static void main(String[] args)
     {
-        /* Suppress MongoDB logs warning */
-        var mongoLogger = Logger.getLogger("org.mongodb.driver");
-
-        mongoLogger.setLevel(Level.OFF);
-
         try
         {
             /* Set config.json path and load configuration from it */
             ConfigRetriever.create(vertx, new io.vertx.config.ConfigRetrieverOptions()
                     .addStore(new ConfigStoreOptions()
-                            .setType("file")
-                            .setFormat("json")
-                            .setConfig(new io.vertx.core.json.JsonObject().put("path", "src/main/resources/config.json"))
-                    )).getConfig(Result ->
+                            .setType(Constants.FILE)
+                            .setFormat(Constants.JSON)
+                            .setConfig(new io.vertx.core.json.JsonObject().put(Constants.PATH, CONFIG_FILE_PATH))
+                    )).getConfig(result ->
             {
-                if (Result.failed())
+                if (result.failed())
                 {
-                    System.err.println("Failed to load configuration: " + Result.cause());
+                    LOGGER.error("Failed to load configuration: ", result.cause());
 
                     return;
                 }
 
-                var config = Result.result();
+                var config = result.result();
 
                 // Initialize MongoDB client and check if the connection is successful
-                MongoClient.init(config).compose(result ->
+                MongoClient.init(config).compose(mongoResponse ->
                 {
-                    System.out.println("Successfully connected to MongoDB");
-
-                    var serverOptions = new DeploymentOptions().setConfig(config).setInstances(Runtime.getRuntime().availableProcessors());
+                    var serverOptions = new DeploymentOptions().setConfig(config).setInstances(SERVER_VERTICLE_INSTANCES);
 
                     // Deploy Server Verticle first
                     return deployVerticle(Server.class.getName(), serverOptions);
 
                 }).compose(serverResponse ->
                 {
-                    System.out.println("Successfully deployed Server Verticle");
-
-                    var discoveryOptions = new DeploymentOptions().setConfig(config).setInstances(Runtime.getRuntime().availableProcessors());
+                    var discoveryOptions = new DeploymentOptions().setConfig(config).setInstances(DISCOVERY_VERTICLE_INSTANCES);
 
                     // Deploy Discovery Verticle
                     return deployVerticle(Discovery.class.getName(), discoveryOptions);
+
+                }).compose(discoveryResponse ->
+                {
+                    var pollerOptions = new DeploymentOptions().setConfig(config).setInstances(POLLER_VERTICLE_INSTANCES);
+
+                    // Deploy Poller Verticle
+                    return deployVerticle(Poller.class.getName(), pollerOptions);
+
+                }).compose(pollerResponse ->
+                {
+                    var objectManagerOptions = new DeploymentOptions().setConfig(config).setInstances(OBJECT_MANAGER_VERTICLE_INSTANCES);
+
+                    // Deploy Poller Verticle
+                    return deployVerticle(ObjectManager.class.getName(), objectManagerOptions);
 
                 }).onComplete(response ->
                 {
                     if (response.succeeded())
                     {
-                        System.out.println("Successfully deployed Discovery Verticle");
+                        LOGGER.info("Successfully deployed all Verticles");
                     }
                     else
                     {
-                        System.err.println("Failed to deploy Verticle: " + response.cause());
+                        LOGGER.error("Failed to deploy Verticle: ", response.cause());
 
                         vertx.close();
                     }
@@ -81,10 +109,8 @@ public class Main
         }
         catch (Exception exception)
         {
-            System.err.println("Failed to deploy verticle: " + exception);
+            LOGGER.error("Failed to deploy verticle: ", exception);
         }
-
-
     }
 
     /* Deploys a Verticle and returns a Future to track success or failure. */
@@ -109,7 +135,9 @@ public class Main
 
         catch (Exception exception)
         {
-            System.err.println("Failed to deploy verticle: " + exception);
+            LOGGER.error("Failed to deploy verticle: {}", verticleName, exception);
+
+            promise.fail(exception);
         }
 
         return promise.future();

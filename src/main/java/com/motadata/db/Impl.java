@@ -1,12 +1,16 @@
 package com.motadata.db;
 
 import io.vertx.core.json.JsonObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
 public class Impl
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(Impl.class);
+
     public void applyMigrations()
     {
         try
@@ -29,18 +33,18 @@ public class Impl
                         .put("validator", options.getJsonObject("validator")), res -> {
                     if (res.succeeded())
                     {
-                        System.out.println("Schema applied to collection: " + collectionName);
+                        LOGGER.info("Schema applied to collection: {}", collectionName);
                     }
                     else
                     {
-                        System.out.println("Error applying schema to " + collectionName + ": " + res.cause().getMessage());
+                        LOGGER.error("Error applying schema to {}: {}", collectionName, res.cause().getMessage());
                     }
                 });
             });
         }
         catch (Exception exception)
         {
-            System.err.println("Failed to apply migrations. " + exception);
+            LOGGER.error("Failed to apply migrations. {}", String.valueOf(exception));
         }
     }
 }

@@ -3,13 +3,26 @@ package com.motadata.api;
 import com.motadata.configs.Auth;
 import com.motadata.constants.Constants;
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.http.HttpServerOptions;
+import io.vertx.core.net.JksOptions;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.JWTAuthHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 public class Server extends AbstractVerticle
 {
-    private Router router;
+    public static final String HTTP_PORT = "http_port";
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(Server.class);
+
+    private static final int SERVER_IDLE_TIMEOUT = 60000;
+
+    private static Router router;
 
     @Override
     public void start()
@@ -21,38 +34,37 @@ public class Server extends AbstractVerticle
 
             if (config == null)
             {
-                System.err.println("Failed to load configuration");
+                LOGGER.error("Failed to load configuration");
 
                 return;
             }
-
-            System.out.println("Loaded all Configs");
 
             Auth.initialize(vertx,config);
 
             router = Router.router(vertx);
 
-            var port = config.getInteger("http_port", Constants.HTTP_PORT);
+            var port = config.getInteger(HTTP_PORT, Constants.HTTP_PORT_VALUE);
 
-            vertx.createHttpServer().requestHandler(router).listen(port, response ->
+            vertx.createHttpServer(new HttpServerOptions()
+                    .setIdleTimeout(SERVER_IDLE_TIMEOUT))  // closes idle connections after 1 minute
+                    .requestHandler(router).listen(port, response ->
             {
                 if (response.succeeded())
                 {
-                    System.out.println("Server started on port 8080");
-
                     setupRoutes();
-
                 }
                 else
                 {
-                    System.err.println("Failed to start server: " + response.cause());
+                    LOGGER.error("Failed to start server: {}", response.cause().getMessage());
+
+                    LOGGER.error("Decoded SSL keystore password: {}", new String(Base64.getDecoder().decode(config.getString(Constants.SSL_KEYSTORE_PASSWORD)), StandardCharsets.UTF_8));  // Debugging line (avoid this in production)
                 }
             });
         }
 
         catch (Exception exception)
         {
-            System.err.println("Failed to start server. " + exception);
+            LOGGER.error("Failed to start server. {}", exception.getMessage());
         }
 
     }
@@ -95,7 +107,7 @@ public class Server extends AbstractVerticle
         }
         catch (Exception exception)
         {
-            System.err.println("Failed to set up routes. " + exception);
+            LOGGER.error("Failed to set up routes. {}", exception.getMessage());
         }
 
     }

@@ -58,9 +58,9 @@
       "validator": {
         "$jsonSchema": {
           "bsonType": "object",
-          "required": ["deviceId", "ip", "cpuUsage", "memoryUsage", "diskUsage", "timestamp"],
+          "required": ["objectId", "ip", "cpuUsage", "memoryUsage", "diskUsage", "timestamp"],
           "properties": {
-            "deviceId": {
+            "objectId": {
               "bsonType": "string",
               "description": "Device identifier"
             },

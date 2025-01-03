@@ -8,17 +8,28 @@ public class Object
 {
     public static void init(Router router)
     {
-        router.post("/provision").handler(context -> context.vertx().eventBus().request(Constants.POLLER_VERTICLE,context.body().asJsonObject(), reply ->
-                {
-                    if (reply.succeeded())
-                    {
-                        context.response().setStatusCode(200).end(((JsonObject) reply.result().body()).encodePrettily());
-                    }
-                    else
-                    {
-                        context.response().setStatusCode(500).end(new JsonObject().put(Constants.ERROR, "Failed to start discovery").encodePrettily());
-                    }
-                })
-        );
+        router.post("/provision").handler(context -> context.vertx().eventBus().request(Constants.PROVISION, context.body().asJsonObject(), reply ->
+        {
+            if (reply.succeeded())
+            {
+                context.response().setStatusCode(Constants.SC_200).end((reply.result().body().toString()));
+            }
+            else
+            {
+                context.response().setStatusCode(Constants.SC_500).end(new JsonObject().put(Constants.ERROR, "Failed to start provision").put(Constants.MESSAGE, reply.result()).encodePrettily());
+            }
+        }));
+
+        router.post("/get").handler(context -> context.vertx().eventBus().request(Constants.OBJECT_POLLING_DATA, context.body().asJsonObject(), reply ->
+        {
+            if (reply.succeeded())
+            {
+                context.response().setStatusCode(Constants.SC_200).end((reply.result().body().toString()));
+            }
+            else
+            {
+                context.response().setStatusCode(Constants.SC_500).end(new JsonObject().put(Constants.ERROR, "Failed to start provision").put(Constants.MESSAGE, reply.result()).encodePrettily());
+            }
+        }));
     }
 }

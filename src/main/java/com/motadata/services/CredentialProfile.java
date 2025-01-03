@@ -5,9 +5,13 @@ import com.motadata.db.Operations;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CredentialProfile
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(CredentialProfile.class);
+
     // Saves device credentials
     public static void save(RoutingContext context)
     {
@@ -54,7 +58,7 @@ public class CredentialProfile
 
         catch (Exception exception)
         {
-            System.err.println("Failed to save credentials. " + exception);
+            LOGGER.error("Failed to save credentials. {}", String.valueOf(exception));
 
             context.response().setStatusCode(Constants.SC_500).end("Error checking for existing credentials: " + exception);
         }
@@ -84,7 +88,7 @@ public class CredentialProfile
 
         catch (Exception exception)
         {
-            System.err.println("Failed to get credentials from database. " + exception);
+            LOGGER.error("Failed to get credentials from database. {}", String.valueOf(exception));
 
             context.response().setStatusCode(Constants.SC_500).end("Error retrieving credentials: ");
         }
@@ -124,7 +128,7 @@ public class CredentialProfile
 
         catch (Exception exception)
         {
-            System.err.println("Failed to find credentials. " + exception);
+            LOGGER.error("Failed to find credentials. {}", String.valueOf(exception));
 
             context.response().setStatusCode(Constants.SC_500).end("error in finding credentials.");
         }

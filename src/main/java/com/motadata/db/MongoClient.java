@@ -5,22 +5,40 @@ import com.motadata.constants.Constants;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.json.JsonObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MongoClient
 {
+    public static final String DB_NAME = "db_name";
+
+    public static final String MIN_MONGODB_POOL_SIZE = "minMongodbPoolSize";
+
+    public static final String MAX_MONGODB_POOL_SIZE = "maxMongodbPoolSize";
+
+    public static final int MIN_MONGODB_POOL_SIZE_VALUE = 3;
+
+    public static final int MAX_MONGODB_POOL_SIZE_VALUE = 8;
+
+    public static final String CONNECTION_STRING = "connection_string";
+
+    public static final String CONNECTION_STRING_VALUE = "mongodb://localhost:27017";
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(MongoClient.class);
+
     private static io.vertx.ext.mongo.MongoClient MONGO_CLIENT;
 
     public static Future<Void> init(JsonObject config)
     {
-        var connectionString = config.getString("connection_string", "mongodb://localhost:27017");
+        var connectionString = config.getString(CONNECTION_STRING, CONNECTION_STRING_VALUE);
 
-        var dbName = config.getString("db_name", Constants.DB_NAME);
+        var dbName = config.getString(DB_NAME, Constants.DB_NAME_VALUE);
 
-        var minPoolSize = config.getInteger("minMongodbPoolSize", 3);
+        var minPoolSize = config.getInteger(MIN_MONGODB_POOL_SIZE, MIN_MONGODB_POOL_SIZE_VALUE);
 
-        var maxPoolSize = config.getInteger("maxMongodbPoolSize", 8);
+        var maxPoolSize = config.getInteger(MAX_MONGODB_POOL_SIZE, MAX_MONGODB_POOL_SIZE_VALUE);
 
-        System.out.println("Connecting to Mongodb...");
+        LOGGER.info("Connecting to MongoDB...");
 
         /* Create a promise to track the success or failure of the connection */
         Promise<Void> promise = Promise.promise();
@@ -38,7 +56,7 @@ public class MongoClient
                 }
                 else
                 {
-                    System.err.println("Failed to connect: " + response.cause().getMessage());
+                    LOGGER.error("Failed to connect: {}", response.cause().getMessage());
 
                     promise.fail(response.cause());
                 }
@@ -47,7 +65,7 @@ public class MongoClient
 
         catch (Exception exception)
         {
-            System.err.println("Failed to initialize mongo client. " + exception);
+            LOGGER.error("Failed to initialize Mongo client. {}", String.valueOf(exception));
         }
 
         return promise.future();

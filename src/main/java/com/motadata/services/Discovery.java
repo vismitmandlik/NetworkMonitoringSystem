@@ -9,6 +9,8 @@ import io.vertx.core.*;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -20,12 +22,12 @@ public class Discovery extends AbstractVerticle
 {
     public static final String CREDENTIALS = "credentials";
 
-    public static final String SUCCESS = "success";
-
     public static final String FAILED = "failed";
 
     public static final String REASON = "reason";
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(Discovery.class);
+    
     @Override
     public void start()
     {
@@ -42,7 +44,7 @@ public class Discovery extends AbstractVerticle
 
             var port = requestBody.getInteger(Constants.PORT);
 
-            var credentialsIds = requestBody.getJsonArray("credentialsIds");
+            var credentialsIds = requestBody.getJsonArray(Constants.CREDENTIALS_ID);
 
             var ips = Utils.extractIpAddresses(ipRange);
 
@@ -71,7 +73,7 @@ public class Discovery extends AbstractVerticle
                                     if (successCredential != null)
                                     {
                                         // If SSH succeeded and returned a credential
-                                        result.put(Constants.STATUS, SUCCESS);
+                                        result.put(Constants.STATUS, Constants.SUCCESS);
 
                                         storeData(ip, port, successCredential);
                                     }
@@ -107,12 +109,12 @@ public class Discovery extends AbstractVerticle
                 {
                     if (AsyncResult.succeeded())
                     {
-                        System.out.println("Discovery result for IP " + ip + ": " + AsyncResult.result().encodePrettily());
+                        LOGGER.info("Discovery result for IP {}: {}", ip, AsyncResult.result().encodePrettily());
                     }
 
                     else
                     {
-                        System.err.println("Error during discovery for IP " + ip + ": " + AsyncResult.cause().getMessage());
+                        LOGGER.error("Error during discovery for IP {}: {}", ip, AsyncResult.cause().getMessage());
                     }
                 });
             }
@@ -120,7 +122,7 @@ public class Discovery extends AbstractVerticle
 
         catch (Exception exception)
         {
-            System.err.println("Error in discovery with exception : " + exception);
+            LOGGER.error("Error in discovery with exception : {}", String.valueOf(exception));
         }
     }
 
@@ -151,7 +153,7 @@ public class Discovery extends AbstractVerticle
 
         catch (Exception exception)
         {
-            System.err.println("Failed to retrieve credentials by id. " + exception);
+            LOGGER.error("Failed to retrieve credentials by id. {}", String.valueOf(exception));
         }
 
         return promise.future();
@@ -184,12 +186,13 @@ public class Discovery extends AbstractVerticle
                         }
                     });
                 }
+
                 return Future.all(futures);
             }, false, asyncHandler ->
             {
                 if (asyncHandler.succeeded())
                 {
-                    System.out.println("Successfully extracted credentials");
+                    LOGGER.info("Successfully extracted credentials");
                 }
 
                 else
@@ -201,7 +204,7 @@ public class Discovery extends AbstractVerticle
 
         catch (Exception exception)
         {
-            System.err.println("Failed to extract credentials. " + exception);
+            LOGGER.error("Failed to extract credentials. {}", exception.getMessage());
         }
 
         return credentialsList;
@@ -219,7 +222,7 @@ public class Discovery extends AbstractVerticle
 
             try
             {
-                var goExecutable = vertx.getOrCreateContext().config().getString(Constants.GO_EXECUTABLE_DIRECTORY);
+                var goExecutable = vertx.getOrCreateContext().config().getString(Constants.GO_EXECUTABLE_PATH);
 
                 if (goExecutable == null || goExecutable.isEmpty())
                 {
@@ -251,7 +254,7 @@ public class Discovery extends AbstractVerticle
                     }
                 }
 
-                System.out.println("Output: " + output);
+                LOGGER.info("Output: {}", output);
 
                 var exitCode = process.waitFor();
 
@@ -259,7 +262,7 @@ public class Discovery extends AbstractVerticle
 
                 if (exitCode == 0)
                 {
-                    System.out.println("Success credentials are: " + result);
+                    LOGGER.info("Success credentials are: {}", result);
 
                 }
 
@@ -267,7 +270,7 @@ public class Discovery extends AbstractVerticle
                 {
                     var errorMessage = "Go process failed with exit code: " + exitCode;
 
-                    System.err.println(errorMessage);
+                    LOGGER.error(errorMessage);
 
                 }
 
@@ -277,7 +280,7 @@ public class Discovery extends AbstractVerticle
 
             catch ( Exception exception)
             {
-                System.err.println("Error starting Go process: " + exception.getMessage());
+                LOGGER.error("Failed to spawn go process : {}", exception.getMessage());
 
                 return null;
             }
@@ -293,7 +296,7 @@ public class Discovery extends AbstractVerticle
 
                     catch (Exception exception)
                     {
-                        System.err.println("Failed to close reader: " + exception.getMessage());
+                        LOGGER.error("Failed to close reader: {}", exception.getMessage());
                     }
                 }
 
@@ -317,21 +320,21 @@ public class Discovery extends AbstractVerticle
                 // Check for existing entry
                 Operations.findOne(Constants.OBJECTS_COLLECTION, query).onComplete(result ->
                 {
-                    if (result == null)
+                    if (result.result() == null)
                     {
                         // No duplicate found, insert the new data
-                        var discoveryData = new JsonObject().put(Constants.IP, ip).put(CREDENTIALS, credential).put(Constants.PORT, port);
+                        var discoveryData = new JsonObject().put(Constants.IP, ip).put(CREDENTIALS, credential).put(Constants.PORT, port).put(Constants.OBJECT_ID, ip);
 
                         Operations.insert(Constants.OBJECTS_COLLECTION, discoveryData).onComplete(asyncResult ->
                         {
                             if (asyncResult != null)
                             {
-                                System.out.println("Successfully stored discovery data: " + discoveryData.encodePrettily());
+                                LOGGER.info("Successfully stored discovery data: {}", discoveryData.encodePrettily());
                             }
 
                             else
                             {
-                                System.err.println("Failed to store discovery data.");
+                                LOGGER.error("Failed to store discovery data.");
                             }
                         });
 
@@ -339,7 +342,7 @@ public class Discovery extends AbstractVerticle
 
                     else
                     {
-                        System.out.println("Duplicate entry found for IP: " + ip + ", Port: " + port);
+                        LOGGER.info("Device rediscovered. Duplicate entry found for IP: {}, Port: {}", ip, port);
                     }
                 });
 
@@ -348,14 +351,14 @@ public class Discovery extends AbstractVerticle
             {
                 if (result.failed())
                 {
-                    System.err.println("Failed to store discovery data. " + result.cause());
+                    LOGGER.error("Failed to store discovery data. {}", result.cause().getMessage());
                 }
             });
         }
 
         catch (Exception exception)
         {
-            System.err.println("Failed to store Discovery Data");
+            LOGGER.error("Failed to store Discovery Data");
         }
     }
 }

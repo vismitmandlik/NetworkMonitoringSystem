@@ -3,24 +3,34 @@ package com.motadata.services;
 import com.motadata.Main;
 import com.motadata.constants.Constants;
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
+import io.vertx.core.json.JsonObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.util.concurrent.TimeUnit;
 
-import static com.motadata.services.ObjectManager.store;
-
 public class Poller extends AbstractVerticle
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(Poller.class);
+
     public void start()
     {
-        vertx.eventBus().localConsumer(Constants.POLLER_VERTICLE);
+        vertx.eventBus().localConsumer(Constants.POLLER_VERTICLE, this::poll);
     }
 
-    public static void poll(JsonArray device, String event)
+    public void poll(Message<JsonObject> message)
     {
+        var requestBody = message.body();
+
+        var device = requestBody.getJsonArray(Constants.DEVICES);
+
+        var event = requestBody.getString(Constants.EVENT);
+
         Main.vertx().executeBlocking(()  ->
         {
             Process process = null;
@@ -29,19 +39,34 @@ public class Poller extends AbstractVerticle
             {
                 if (device == null || device.isEmpty())
                 {
-                    System.err.println("Device is null or empty.");
+                    LOGGER.error("Device is null or empty.");
+
+                    message.fail(Constants.SC_400,"Devices array is null or empty.");
 
                     return false;
                 }
 
-                var devicesJsonString = new JsonArray().add(device).encode();
+                if (event == null || event.isEmpty())
+                {
+                    LOGGER.error("Event is null or empty.");
+
+                    message.fail(Constants.SC_400,"Event is null or empty.");
+
+                    return false;
+                }
+
+                var devicesJsonString = device.encode();
+
+                LOGGER.info("Devices string: {}", devicesJsonString);
 
                 var goExecutable = Main.vertx().getOrCreateContext().config().getString(Constants.GO_EXECUTABLE_PATH);
 
                 // Check if goExecutable is null
                 if (goExecutable == null)
                 {
-                    System.err.println("goExecutablePath is null and not set in the configuration.");
+                    LOGGER.error("goExecutablePath is null and not set in the configuration.");
+
+                    message.fail(Constants.SC_500,"Go executable path is not configured.");
 
                     return false;
                 }
@@ -52,9 +77,9 @@ public class Poller extends AbstractVerticle
                 var outputLines = new JsonArray();
 
                 // Use try-with-resources to handle BufferedReader
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream())))
+                try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream())))
                 {
-                    String line;
+                    var line = "";
 
                     while ((line = reader.readLine()) != null)
                     {
@@ -62,21 +87,26 @@ public class Poller extends AbstractVerticle
                     }
                 }
 
-                process.waitFor(Main.vertx().getOrCreateContext().config().getInteger("pollerTimeout"), TimeUnit.SECONDS);
+                process.waitFor(Main.vertx().getOrCreateContext().config().getInteger(Constants.POLLER_TIMEOUT), TimeUnit.SECONDS);
 
                 // Print polling result
                 if (process.exitValue() == 0)
                 {
-                    System.out.println("Polling result for devices: "  + outputLines.encodePrettily());
+                    LOGGER.info("Polling result for devices: {}", outputLines.encodePrettily());
 
-                    store(outputLines);
+                    ObjectManager.store(outputLines);
+
+                    // Send reply if needed
+                    message.reply(new JsonObject().put(Constants.STATUS, Constants.SUCCESS).put(Constants.MESSAGE, "Polling successful"));
 
                     return true;
                 }
 
                 else
                 {
-                    System.out.println("Polling failed for devices " );
+                    LOGGER.error("Polling failed for devices.");
+
+                    message.fail(Constants.SC_500, "Polling failed");
 
                     return false;
                 }
@@ -84,7 +114,9 @@ public class Poller extends AbstractVerticle
 
             catch (Exception exception)
             {
-                System.err.println("Failed to poll device. " + exception);
+                LOGGER.error("Failed to poll device: {}", exception.getMessage());
+
+                message.fail(Constants.SC_500,"Exception during polling: ");
 
                 return false;
             }
@@ -96,22 +128,26 @@ public class Poller extends AbstractVerticle
                 {
                     process.destroy();
 
-                    System.out.println("Polling process for devices was destroyed.");
+                    LOGGER.debug("Polling process for devices was destroyed.");
                 }
 
-                System.out.println("Poll process completed");
+                LOGGER.info("Poll process completed.");
             }
 
         }, false, asyncHandler ->
         {
             if (asyncHandler.succeeded())
             {
-                System.out.println("Poll completed successfully");
+                LOGGER.info("Poll completed successfully");
+
+                message.reply(asyncHandler.result());
             }
 
             else
             {
-                System.err.println("Poll failed with error: " + asyncHandler.cause());
+                LOGGER.error("Poll failed with error: {}", asyncHandler.cause().getMessage());
+
+                message.fail(Constants.SC_500, asyncHandler.cause().getMessage());
             }
         });
     }

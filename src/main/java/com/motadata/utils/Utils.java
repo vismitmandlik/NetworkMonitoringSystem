@@ -1,17 +1,26 @@
 package com.motadata.utils;
 
 import com.motadata.Main;
-import com.motadata.services.ObjectManager;
+import com.motadata.constants.Constants;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.json.JsonObject;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
+@Slf4j
 public class Utils
 {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
 
     public static Future<Boolean> ping(String ip)
     {
@@ -43,7 +52,7 @@ public class Utils
 
                 else
                 {
-                    System.err.println("Ping failed for " + ip + ":\n" + output);
+                    LOGGER.error("Ping failed for {}:\n{}", ip, output);
 
                     return false;
                 }
@@ -51,11 +60,11 @@ public class Utils
 
             catch (Exception exception)
             {
-                System.err.println("Failed to ping ip. " + exception);
+                LOGGER.error("Failed to ping IP {}: {}", ip, exception.getMessage());
 
                 return false; // Return false on exception
             }
-        });
+        },false);
     }
 
     public static ArrayList<String> extractIpAddresses(String ipRange)
@@ -95,7 +104,7 @@ public class Utils
 
         catch (Exception exception)
         {
-            System.err.println("Failed to extract ip addresses. " + exception);
+            LOGGER.error("Failed to extract IP addresses from range {}: {}", ipRange, exception.getMessage());
         }
 
         return items;
@@ -116,7 +125,7 @@ public class Utils
 
                 else
                 {
-                    System.err.println("Failed to connect to " + ip + ":" + port + " - " + res.cause().getMessage());
+                    LOGGER.error("Failed to connect to {}:{} - {}", ip, port, res.cause().getMessage());
 
                     promise.complete(false);
                 }
@@ -124,7 +133,7 @@ public class Utils
         }
         catch (Exception exception)
         {
-            System.err.println("Failed to check port. " + exception);
+            LOGGER.error("Failed to check port on {}:{} - {}", ip, port, exception.getMessage());
 
             promise.fail(exception);
         }
@@ -138,18 +147,18 @@ public class Utils
         {
             var result = new JsonObject(pollerResult);
 
-            var deviceId = result.getString("deviceId");
+            var objectId = result.getString(Constants.OBJECT_ID);
 
-            if (deviceId == null || deviceId.isEmpty())
+            if (objectId == null || objectId.isEmpty())
 
             {
-                System.err.println("DeviceId is null or empty in result: " + result);
+                LOGGER.error("objectId is null or empty in result: {}", result);
 
                 return null;
             }
 
             return new JsonObject()
-                    .put("deviceId", deviceId)
+                    .put("objectId", objectId)
                     .put("ip", result.getString("ip"))
                     .put("cpuUsage", parseDouble(result.getString("cpuUsage")))
                     .put("memoryUsage", parseDouble(result.getString("memoryUsage")))
@@ -157,7 +166,7 @@ public class Utils
         }
         catch (Exception exception)
         {
-            System.err.println("Failed to parse poller result: " + pollerResult + exception);
+            LOGGER.error("Failed to parse poller result: {} - {}", pollerResult, exception.getMessage());
 
             return null;
         }
@@ -171,13 +180,10 @@ public class Utils
         }
         catch (NumberFormatException exception)
         {
+            LOGGER.warn("Failed to parse value to double: {}", value);
+
             return 0.0;
         }
-    }
-
-    public static String errorResponse(String message)
-    {
-        return new JsonObject().put("error", message).toString();
     }
 
     public static String successResponse()
@@ -187,6 +193,40 @@ public class Utils
 
     public static boolean isValidRequest(JsonObject requestBody)
     {
-        return requestBody != null && requestBody.containsKey(ObjectManager.OBJECT_IDS) && requestBody.containsKey(ObjectManager.POLL_INTERVAL);
+        return requestBody != null && requestBody.containsKey(Constants.OBJECT_IDS) && requestBody.containsKey(Constants.POLL_INTERVAL);
+    }
+
+    public static void parsePollingResults(List<JsonObject> pollingResults)
+    {
+        try
+        {
+            // Iterate over each polling result
+            for (JsonObject result : pollingResults)
+            {
+                // Extract lastPollTime and convert to human-readable format
+                var lastPollTime = result.getLong("lastPollTime");
+
+                var formattedTime = convertTimestampToActualTime(lastPollTime);
+
+                // Print the simplified result
+                LOGGER.info("Object ID: {}", result.getString(Constants.OBJECT_ID));
+                LOGGER.info("IP: {}", result.getString(Constants.IP));
+                LOGGER.info("CPU Usage: {}", result.getDouble(Constants.CPU_USAGE));
+                LOGGER.info("Memory Usage: {}", result.getDouble(Constants.MEMORY_USAGE));
+                LOGGER.info("Disk Usage: {}", result.getDouble(Constants.DISK_USAGE));
+                LOGGER.info("Last Poll Time: {}", formattedTime);
+                LOGGER.info("-----");
+            }
+        }
+        catch (Exception exception)
+        {
+            LOGGER.error("Failed to parse polling results {} ", exception.getMessage());
+        }
+
+    }
+
+    public static String convertTimestampToActualTime(long timestamp)
+    {
+        return new SimpleDateFormat("HH:mm:ss").format(new Date(timestamp));
     }
 }
