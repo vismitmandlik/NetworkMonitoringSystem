@@ -12,5 +12,7 @@ public class CredentialProfile
         router.get("/").handler(com.motadata.services.CredentialProfile::getAll);
 
         router.post("/:name").handler(com.motadata.services.CredentialProfile::find);
+
+        router.put("/:name").handler(com.motadata.services.CredentialProfile::update);
     }
 }

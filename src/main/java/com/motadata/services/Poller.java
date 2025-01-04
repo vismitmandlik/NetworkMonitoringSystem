@@ -57,7 +57,7 @@ public class Poller extends AbstractVerticle
 
                 var devicesJsonString = device.encode();
 
-                LOGGER.info("Devices string: {}", devicesJsonString);
+                LOGGER.debug("Devices string: {}", devicesJsonString);
 
                 var goExecutable = Main.vertx().getOrCreateContext().config().getString(Constants.GO_EXECUTABLE_PATH);
 
@@ -131,7 +131,7 @@ public class Poller extends AbstractVerticle
                     LOGGER.debug("Polling process for devices was destroyed.");
                 }
 
-                LOGGER.info("Poll process completed.");
+                LOGGER.debug("Poll process completed.");
             }
 
         }, false, asyncHandler ->

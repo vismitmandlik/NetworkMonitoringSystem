@@ -4,15 +4,11 @@ import com.motadata.configs.Auth;
 import com.motadata.constants.Constants;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.http.HttpServerOptions;
-import io.vertx.core.net.JksOptions;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.JWTAuthHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 
 public class Server extends AbstractVerticle
 {
@@ -57,7 +53,6 @@ public class Server extends AbstractVerticle
                 {
                     LOGGER.error("Failed to start server: {}", response.cause().getMessage());
 
-                    LOGGER.error("Decoded SSL keystore password: {}", new String(Base64.getDecoder().decode(config.getString(Constants.SSL_KEYSTORE_PASSWORD)), StandardCharsets.UTF_8));  // Debugging line (avoid this in production)
                 }
             });
         }

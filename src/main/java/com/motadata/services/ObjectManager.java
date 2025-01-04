@@ -35,6 +35,9 @@ public class ObjectManager extends AbstractVerticle
         // EventBus consumer to handle polling results request
         vertx.eventBus().consumer(Constants.OBJECT_POLLING_DATA, this::getPollerResult);
 
+        // EventBus consumer for object deletion
+        vertx.eventBus().consumer(Constants.OBJECT_DELETE, this::deleteObject);
+
         promise.complete();
     }
 
@@ -139,7 +142,7 @@ public class ObjectManager extends AbstractVerticle
                         {
                             sendBatchToPoller(batch, event);
 
-                            LOGGER.info("Batch sent for polling: {}", batch.encodePrettily());
+                            LOGGER.debug("Batch sent for polling: {}", batch.encodePrettily());
 
                             batch = new JsonArray(); // Reset batch for the next 25 devices
 
@@ -153,7 +156,7 @@ public class ObjectManager extends AbstractVerticle
                 {
                     sendBatchToPoller(batch, event);
 
-                    LOGGER.info("Batch sent for polling: {}", batch.encodePrettily());
+                    LOGGER.debug("Batch sent for polling: {}", batch.encodePrettily());
 
                 }
 
@@ -231,6 +234,8 @@ public class ObjectManager extends AbstractVerticle
                 if (result != null)
                 {
                     result.put(Constants.LAST_POLL_TIME, timestamp);
+
+                    LOGGER.info("Provision result {} ", result.encodePrettily());
 
                     Operations.insert(Constants.POLLER_RESULTS_COLLECTION, result).onComplete(asyncResult ->
                     {
@@ -321,5 +326,45 @@ public class ObjectManager extends AbstractVerticle
                 LOGGER.error("Error fetching polling results: {}", result.cause().getMessage());
             }
         });
+    }
+
+    // Method to handle object deletion
+    private void deleteObject(Message<JsonObject> message)
+    {
+        var objectId = message.body().getString(Constants.OBJECT_ID);
+
+        if (objectId == null || objectId.isEmpty())
+        {
+            message.fail(Constants.SC_400, "objectId is missing");
+
+            return;
+        }
+
+        try
+        {
+            // Delete the object from the database
+            var query = new JsonObject().put(Constants.OBJECT_ID, objectId);
+            Operations.delete(Constants.OBJECTS_COLLECTION, query).onComplete(asyncResult ->
+            {
+                if (asyncResult.succeeded())
+                {
+                    LOGGER.info("Object with ID {} deleted successfully.", objectId);
+
+                    message.reply("Object deleted successfully.");
+                }
+                else
+                {
+                    LOGGER.error("Failed to delete object with ID {}. {}", objectId, asyncResult.cause().getMessage());
+
+                    message.fail(Constants.SC_500, "Failed to delete object: " + asyncResult.cause().getMessage());
+                }
+            });
+        }
+        catch (Exception exception)
+        {
+            LOGGER.error("Error deleting object with ID {}. {}", objectId, exception.getMessage());
+
+            message.fail(Constants.SC_500, "Error deleting object: " + exception.getMessage());
+        }
     }
 }

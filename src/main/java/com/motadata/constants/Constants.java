@@ -98,7 +98,5 @@ public class Constants
 
     public static final String PATH = "path";
 
-    public static final String SSL_KEYSTORE_PATH = "ssl_keystore_path";
-
-    public static final String SSL_KEYSTORE_PASSWORD = "ssl_keystore_password";
+    public static final String OBJECT_DELETE = "object.delete";
 }

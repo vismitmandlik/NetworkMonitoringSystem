@@ -134,4 +134,65 @@ public class CredentialProfile
         }
 
     }
+
+    public static void update(RoutingContext context)
+    {
+        var name = context.request().getParam(Constants.NAME);
+
+        if (name == null || name.isEmpty())
+        {
+            context.response().setStatusCode(Constants.SC_404).end("Invalid request: 'name' is missing");
+            return;
+        }
+
+        var requestBody = context.body().asJsonObject();
+
+        var username = requestBody.getString(Constants.USERNAME);
+
+        var password = requestBody.getString(Constants.PASSWORD);
+
+        var query = new JsonObject().put(Constants.NAME, name);
+
+        var updateFields = new JsonObject();
+
+        if (username != null)
+        {
+            updateFields.put(Constants.USERNAME, username);
+        }
+
+        if (password != null)
+        {
+            updateFields.put(Constants.PASSWORD, password);
+        }
+
+        if (updateFields.isEmpty())
+        {
+            context.response().setStatusCode(Constants.SC_400).end("No valid fields to update.");
+
+            return;
+        }
+
+        try
+        {
+            Operations.update(Constants.CREDENTIALS_COLLECTION, query, new JsonObject().put("$set", updateFields)).onComplete(result ->
+            {
+                if (result.succeeded())
+                {
+                    context.response().setStatusCode(Constants.SC_200).end("Credential updated successfully.");
+                }
+                else
+                {
+                    context.response().setStatusCode(Constants.SC_404).end("Credential not found for update.");
+                }
+            });
+        }
+        catch (Exception exception)
+        {
+            LOGGER.error("Failed to update credentials. {}", exception.getMessage());
+
+            context.response().setStatusCode(Constants.SC_500).end("Error updating credentials: " + exception.getMessage());
+        }
+    }
+
+
 }

@@ -254,7 +254,7 @@ public class Discovery extends AbstractVerticle
                     }
                 }
 
-                LOGGER.info("Output: {}", output);
+                LOGGER.info("Output------: {}", output);
 
                 var exitCode = process.waitFor();
 
