@@ -63,7 +63,6 @@
 
                 for (var ip : ips)
                 {
-                    System.out.println("loop for ip " + ip);
 
                     // Create a result object for this IP
                     var result = new JsonObject().put(Constants.IP, ip);
@@ -81,18 +80,13 @@
                                     // Add to batch
                                     batch.add(deviceDetails);
 
-                                    System.out.println("printing batch 82" +  batch);
-
                                     // If batch size exceeds the threshold (25), spawn the Go process and reset the batch
                                     if (batch.size() >= BATCH_SIZE)
                                     {
-                                        System.out.println("printing batch 87 " +  batch);
-                                        System.out.println("inside batch size if()");
                                         spawnGoProcess(batch).onComplete(asyncResult ->
                                         {
                                             if (asyncResult.succeeded())
                                             {
-                                                System.out.println("result :::::" + asyncResult.result());
                                                 LOGGER.info("Go process for batch completed successfully.");
 
                                                 successfulDevices.addAll(getSuccessfulDevices(batch));  // Store only successful devices
@@ -105,8 +99,6 @@
 
                                         batch.clear();  // Reset batch after processing
                                     }
-                                    System.out.println("printing batch 104" +  batch);
-
 
                                 }
 
@@ -121,8 +113,6 @@
 
                         else
                         {
-                            System.out.println("else 123");
-
                             result.put(Constants.STATUS, FAILED).put(REASON, "IP not reachable");
 
                             return Future.succeededFuture(result);
@@ -133,10 +123,6 @@
                     futures.add(future);
                 }
 
-
-                System.out.println("printing batch 134 " +  batch);
-
-
                 Future.all(futures).onComplete(asyncResult ->
                 {
                     if (asyncResult.succeeded())
@@ -144,17 +130,13 @@
                         // If there are any remaining devices after the loop ends (i.e., batch < 25), process them
                         if (!batch.isEmpty())
                         {
-                            System.out.println("inside batch empty 129");
                             var future = spawnGoProcess(batch).onComplete(result ->
                             {
                                 if (result.succeeded())
                                 {
                                     LOGGER.info("Go process for remaining batch completed successfully.");
-                                    System.out.println("result :::::" + result.result());
 
                                     successfulDevices.addAll(getSuccessfulDevices(batch));  // Add remaining successful devices
-
-                                    System.out.println("printing successdevices " + successfulDevices);
                                 }
                                 else
                                 {
@@ -168,8 +150,8 @@
                             futures.add(future);
                         }
 
-                        System.out.println("inside 154");
                         LOGGER.info(asyncResult.result().toString());
+
                         var results = asyncResult.result().list(); // Get the list of results
 
                         for (var i = 0; i < ips.size(); i++)
@@ -184,7 +166,6 @@
 
                     else
                     {
-                        System.out.println("inside 170");
                         LOGGER.error("Error during discovery {}", asyncResult.cause().getMessage());
                     }
                 });
@@ -325,8 +306,7 @@
                         throw new Exception("goExecutablePath is not set in the configuration.");
                     }
 
-                    System.out.println("inside spawn go");
-                    LOGGER.info("Attempting to spawn Go process with batch: {}", batch.encodePrettily());
+                    LOGGER.info("Attempting to spawn Go process with batch: {}", batch.encode());
 
                     var processBuilder = new ProcessBuilder(goExecutable, Constants.DISCOVERY_EVENT, batch.encode()).directory(new File(config().getString(Constants.GO_EXECUTABLE_DIRECTORY)));
 
@@ -336,7 +316,6 @@
 
                     var output = new StringBuilder();
 
-
                     var line = "";
 
                     while ((line = reader.readLine()) != null)
@@ -345,7 +324,7 @@
 
                         LOGGER.info("Raw Go output: {}", line);
 
-                        if (line.contains("Successful login for IP"))
+                        if (line.contains("IP success, Credentials"))
                         {
                             var startIndex = line.indexOf("{");
 
@@ -365,7 +344,6 @@
                     if (exitCode == 0)
                     {
                         LOGGER.info("Success credentials are: {}", result);
-
                     }
 
                     else
@@ -382,7 +360,7 @@
 
                 catch ( Exception exception)
                 {
-                    LOGGER.error("Failed to spawn go process : {}", exception.getMessage());
+                    LOGGER.debug("Failed to spawn go process : {}", exception.getMessage());
 
                     return null;
                 }
@@ -412,8 +390,6 @@
 
         private void storeData(JsonArray successfulDevices)
         {
-            LOGGER.info("Storing successful devices: {}", successfulDevices.encodePrettily());
-
             try
             {
                 Main.vertx().executeBlocking(() ->
@@ -476,12 +452,14 @@
         // New helper function to filter successful devices
         private JsonArray getSuccessfulDevices(JsonArray batch)
         {
-            System.out.println("get success devices bathc "+ batch.encodePrettily());
             JsonArray successfulDevices = new JsonArray();
-            for (var deviceObj : batch) {
+
+            for (var deviceObj : batch)
+            {
                 JsonObject device = (JsonObject) deviceObj;
-                // Assuming each device object contains a status or flag indicating if it succeeded
-                if (device.getBoolean("success", false)) {
+
+                if (device.containsKey("credentials"))
+                {
                     successfulDevices.add(device);
                 }
             }
