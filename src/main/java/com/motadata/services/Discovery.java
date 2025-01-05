@@ -1,364 +1,490 @@
-package com.motadata.services;
+    package com.motadata.services;
 
-import com.motadata.Main;
-import com.motadata.constants.Constants;
-import com.motadata.db.Operations;
+    import com.motadata.Main;
+    import com.motadata.constants.Constants;
+    import com.motadata.db.Operations;
 
-import com.motadata.utils.Utils;
-import io.vertx.core.*;
-import io.vertx.core.eventbus.Message;
-import io.vertx.core.json.JsonArray;
-import io.vertx.core.json.JsonObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+    import com.motadata.utils.Utils;
+    import io.vertx.core.*;
+    import io.vertx.core.eventbus.Message;
+    import io.vertx.core.json.JsonArray;
+    import io.vertx.core.json.JsonObject;
+    import org.slf4j.Logger;
+    import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.List;
+    import java.io.BufferedReader;
+    import java.io.File;
+    import java.io.InputStreamReader;
+    import java.util.ArrayList;
+    import java.util.List;
 
-public class Discovery extends AbstractVerticle
-{
-    public static final String CREDENTIALS = "credentials";
-
-    public static final String FAILED = "failed";
-
-    public static final String REASON = "reason";
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(Discovery.class);
-    
-    @Override
-    public void start()
+    public class Discovery extends AbstractVerticle
     {
-        vertx.eventBus().localConsumer(Constants.DISCOVERY_VERTICLE, this::discovery);
-    }
+        public static final String CREDENTIALS = "credentials";
 
-    public void discovery(Message<Object> message)
-    {
-        try
+        public static final String FAILED = "failed";
+
+        public static final String REASON = "reason";
+
+        private static final Logger LOGGER = LoggerFactory.getLogger(Discovery.class);
+
+        private static final int BATCH_SIZE = 25;
+
+        @Override
+        public void start()
         {
-            var requestBody = (JsonObject) message.body();
+            vertx.eventBus().localConsumer(Constants.DISCOVERY_VERTICLE, this::discovery);
+        }
 
-            var ipRange = requestBody.getString(Constants.IP);
-
-            var port = requestBody.getInteger(Constants.PORT);
-
-            var credentialsIds = requestBody.getJsonArray(Constants.CREDENTIALS_ID);
-
-            var ips = Utils.extractIpAddresses(ipRange);
-
-            var credentialsList = extractCredentials(credentialsIds);
-
-            message.reply(new JsonObject().put(Constants.STATUS, "Discovery started"));
-
-            for (var ip : ips)
+        public void discovery(Message<Object> message)
+        {
+            try
             {
-                // Create a result object for this IP
-                var result = new JsonObject().put(Constants.IP, ip);
+                var requestBody = (JsonObject) message.body();
 
-                var future = Utils.ping(ip).compose(isReachable ->
+                var ipRange = requestBody.getString(Constants.IP);
+
+                var port = requestBody.getInteger(Constants.PORT);
+
+                var credentialsIds = requestBody.getJsonArray(Constants.CREDENTIALS_ID);
+
+                var ips = Utils.extractIpAddresses(ipRange);
+
+                var credentialsList = extractCredentials(credentialsIds);
+
+                var batch = new JsonArray();
+
+                var successfulDevices = new JsonArray();
+
+                // Create an ArrayList to collect the futures
+                var futures = new ArrayList<Future<JsonObject>>();
+
+                message.reply(new JsonObject().put(Constants.STATUS, "Discovery started"));
+
+                for (var ip : ips)
                 {
-                    if (isReachable)
-                    {
-                        return Utils.checkPort(ip, port).compose(isOpen ->
-                        {
-                            if (isOpen)
-                            {
-                                var ipCredentialObject = new JsonObject().put(Constants.IP, ip).put(Constants.PORT, port).put(CREDENTIALS, new JsonArray(credentialsList));
+                    System.out.println("loop for ip " + ip);
 
-                                // Spawn Go process with IP
-                                return spawnGoProcess(ipCredentialObject).map(successCredential ->
+                    // Create a result object for this IP
+                    var result = new JsonObject().put(Constants.IP, ip);
+
+                    var future = Utils.ping(ip).compose(isReachable ->
+                    {
+                        if (isReachable)
+                        {
+                            return Utils.checkPort(ip, port).compose(isOpen ->
+                            {
+                                if (isOpen)
                                 {
-                                    if (successCredential != null)
+                                    var deviceDetails = new JsonObject().put(Constants.IP, ip).put(Constants.PORT, port).put(CREDENTIALS, new JsonArray(credentialsList));
+
+                                    // Add to batch
+                                    batch.add(deviceDetails);
+
+                                    System.out.println("printing batch 82" +  batch);
+
+                                    // If batch size exceeds the threshold (25), spawn the Go process and reset the batch
+                                    if (batch.size() >= BATCH_SIZE)
                                     {
-                                        // If SSH succeeded and returned a credential
-                                        result.put(Constants.STATUS, Constants.SUCCESS);
+                                        System.out.println("printing batch 87 " +  batch);
+                                        System.out.println("inside batch size if()");
+                                        spawnGoProcess(batch).onComplete(asyncResult ->
+                                        {
+                                            if (asyncResult.succeeded())
+                                            {
+                                                System.out.println("result :::::" + asyncResult.result());
+                                                LOGGER.info("Go process for batch completed successfully.");
 
-                                        storeData(ip, port, successCredential);
+                                                successfulDevices.addAll(getSuccessfulDevices(batch));  // Store only successful devices
+                                            }
+                                            else
+                                            {
+                                                LOGGER.error("Go process for batch failed.");
+                                            }
+                                        });
+
+                                        batch.clear();  // Reset batch after processing
                                     }
+                                    System.out.println("printing batch 104" +  batch);
 
-                                    else
-                                    {
-                                        result.put(Constants.STATUS, FAILED).put(REASON, "SSH failed");
-                                    }
 
-                                    return result;
-                                });
-                            }
+                                }
 
-                            else
-                            {
-                                result.put(Constants.STATUS, FAILED).put(REASON, "Port not open");
+                                else
+                                {
+                                    result.put(Constants.STATUS, FAILED).put(REASON, "Port not open");
 
+                                }
                                 return Future.succeededFuture(result);
-                            }
-                        });
-                    }
-
-                    else
-                    {
-                        result.put(Constants.STATUS, FAILED).put(REASON, "IP not reachable");
-
-                        return Future.succeededFuture(result);
-                    }
-
-                }).onFailure(err -> result.put(Constants.STATUS, FAILED).put(REASON, err.getMessage()));
-
-                future.onComplete(AsyncResult ->
-                {
-                    if (AsyncResult.succeeded())
-                    {
-                        LOGGER.info("Discovery result for IP {}: {}", ip, AsyncResult.result().encodePrettily());
-                    }
-
-                    else
-                    {
-                        LOGGER.error("Error during discovery for IP {}: {}", ip, AsyncResult.cause().getMessage());
-                    }
-                });
-            }
-        }
-
-        catch (Exception exception)
-        {
-            LOGGER.error("Error in discovery with exception : {}", String.valueOf(exception));
-        }
-    }
-
-    private Future<JsonObject> retrieveCredentialById(String credentialsId)
-    {
-        // Simulate fetching a credential from the database based on the ID
-        var promise = Promise.<JsonObject>promise();
-
-        var query = new JsonObject().put(Constants.ID, credentialsId);
-
-        try
-        {
-            // Return null if no credential found
-            Operations.findOne(Constants.CREDENTIALS_COLLECTION, query)
-                    .onComplete(result ->
-                    {
-                        if(result.succeeded())
-                        {
-                            promise.complete(result.result());
+                            });
                         }
 
                         else
                         {
-                            promise.fail(result.cause());
+                            System.out.println("else 123");
+
+                            result.put(Constants.STATUS, FAILED).put(REASON, "IP not reachable");
+
+                            return Future.succeededFuture(result);
                         }
-                    });
-        }
 
-        catch (Exception exception)
-        {
-            LOGGER.error("Failed to retrieve credentials by id. {}", String.valueOf(exception));
-        }
+                    }).onFailure(err -> result.put(Constants.STATUS, FAILED).put(REASON, err.getMessage()));
 
-        return promise.future();
-    }
+                    futures.add(future);
+                }
 
-    private List<JsonObject> extractCredentials(JsonArray credentialsIds)
-    {
-        var credentialsList = new ArrayList<JsonObject>();
 
-        var futures = new ArrayList<Future<JsonObject>>();
+                System.out.println("printing batch 134 " +  batch);
 
-        try
-        {
-            // Using executeBlocking to handle blocking database operations
-            vertx.executeBlocking(() ->
-            {
-                for (var i = 0; i < credentialsIds.size(); i++)
+
+                Future.all(futures).onComplete(asyncResult ->
                 {
-                    var credId = credentialsIds.getString(i);
-
-                    var credentialFuture = retrieveCredentialById(credId);
-
-                    futures.add(credentialFuture);
-
-                    credentialFuture.onComplete(result ->
+                    if (asyncResult.succeeded())
                     {
-                        if (result != null)
+                        // If there are any remaining devices after the loop ends (i.e., batch < 25), process them
+                        if (!batch.isEmpty())
                         {
-                            credentialsList.add(result.result());
+                            System.out.println("inside batch empty 129");
+                            var future = spawnGoProcess(batch).onComplete(result ->
+                            {
+                                if (result.succeeded())
+                                {
+                                    LOGGER.info("Go process for remaining batch completed successfully.");
+                                    System.out.println("result :::::" + result.result());
+
+                                    successfulDevices.addAll(getSuccessfulDevices(batch));  // Add remaining successful devices
+
+                                    System.out.println("printing successdevices " + successfulDevices);
+                                }
+                                else
+                                {
+                                    LOGGER.error("Go process for remaining batch failed.");
+                                }
+
+                                // After processing all devices, store only the successful ones
+                                storeData(successfulDevices);  // Store only the devices that succeeded
+                            });
+
+                            futures.add(future);
                         }
-                    });
-                }
 
-                return Future.all(futures);
-            }, false, asyncHandler ->
+                        System.out.println("inside 154");
+                        LOGGER.info(asyncResult.result().toString());
+                        var results = asyncResult.result().list(); // Get the list of results
+
+                        for (var i = 0; i < ips.size(); i++)
+                        {
+                            var ip = ips.get(i);
+
+                            var result = results.get(i);
+
+                            LOGGER.info("Discovery result for IP {}: {}", ip, result);
+                        }
+                    }
+
+                    else
+                    {
+                        System.out.println("inside 170");
+                        LOGGER.error("Error during discovery {}", asyncResult.cause().getMessage());
+                    }
+                });
+            }
+
+            catch (Exception exception)
             {
-                if (asyncHandler.succeeded())
-                {
-                    LOGGER.info("Successfully extracted credentials");
-                }
-
-                else
-                {
-                    System.err.println("Failed to extract credentials: " + asyncHandler.cause());
-                }
-            });
+                LOGGER.error("Error in discovery with exception : {}", String.valueOf(exception));
+            }
         }
 
-        catch (Exception exception)
+        private Future<JsonObject> retrieveCredentialById(String credentialsId)
         {
-            LOGGER.error("Failed to extract credentials. {}", exception.getMessage());
-        }
+            // Simulate fetching a credential from the database based on the ID
+            var promise = Promise.<JsonObject>promise();
 
-        return credentialsList;
-    }
-
-    private Future<JsonObject> spawnGoProcess(JsonObject ipCredentialObject)
-    {
-        return vertx.executeBlocking(() ->
-        {
-            Process process = null;
-
-            BufferedReader reader = null;
-
-            var successfulCredential = "";
+            var query = new JsonObject().put(Constants.ID, credentialsId);
 
             try
             {
-                var goExecutable = vertx.getOrCreateContext().config().getString(Constants.GO_EXECUTABLE_PATH);
-
-                if (goExecutable == null || goExecutable.isEmpty())
-                {
-                    throw new Exception("goExecutablePath is not set in the configuration.");
-                }
-
-                var processBuilder = new ProcessBuilder(goExecutable, Constants.DISCOVERY_EVENT, ipCredentialObject.encode()).directory(new File(config().getString(Constants.GO_EXECUTABLE_DIRECTORY)));
-
-                process = processBuilder.start();
-
-                reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-
-                var output = new StringBuilder();
-
-                var line = "";
-
-                while ((line = reader.readLine()) != null)
-                {
-                    output.append(line).append("\n");
-
-                    if (line.contains("Successful login for IP"))
-                    {
-                        var startIndex = line.indexOf("{");
-
-                        if (startIndex != -1)
+                // Return null if no credential found
+                Operations.findOne(Constants.CREDENTIALS_COLLECTION, query)
+                        .onComplete(result ->
                         {
-                            successfulCredential = line.substring(startIndex).trim();
-                        }
-                    }
-                }
-
-                LOGGER.info("Output------: {}", output);
-
-                var exitCode = process.waitFor();
-
-                var result = new JsonObject(successfulCredential);
-
-                if (exitCode == 0)
-                {
-                    LOGGER.info("Success credentials are: {}", result);
-
-                }
-
-                else
-                {
-                    var errorMessage = "Go process failed with exit code: " + exitCode;
-
-                    LOGGER.error(errorMessage);
-
-                }
-
-                return result;
-
-            }
-
-            catch ( Exception exception)
-            {
-                LOGGER.error("Failed to spawn go process : {}", exception.getMessage());
-
-                return null;
-            }
-
-            finally
-            {
-                if (reader != null)
-                {
-                    try
-                    {
-                        reader.close();
-                    }
-
-                    catch (Exception exception)
-                    {
-                        LOGGER.error("Failed to close reader: {}", exception.getMessage());
-                    }
-                }
-
-                if (process != null)
-                {
-                    process.destroy();
-                }
-            }
-        },false);
-    }
-
-    private void storeData(String ip, int port, JsonObject credential)
-    {
-        // Query to check for duplicates
-        var query = new JsonObject().put(Constants.IP, ip);
-
-        try
-        {
-            Main.vertx().executeBlocking(() ->
-            {
-                // Check for existing entry
-                Operations.findOne(Constants.OBJECTS_COLLECTION, query).onComplete(result ->
-                {
-                    if (result.result() == null)
-                    {
-                        // No duplicate found, insert the new data
-                        var discoveryData = new JsonObject().put(Constants.IP, ip).put(CREDENTIALS, credential).put(Constants.PORT, port).put(Constants.OBJECT_ID, ip);
-
-                        Operations.insert(Constants.OBJECTS_COLLECTION, discoveryData).onComplete(asyncResult ->
-                        {
-                            if (asyncResult != null)
+                            if(result.succeeded())
                             {
-                                LOGGER.info("Successfully stored discovery data: {}", discoveryData.encodePrettily());
+                                promise.complete(result.result());
                             }
 
                             else
                             {
-                                LOGGER.error("Failed to store discovery data.");
+                                promise.fail(result.cause());
                             }
                         });
+            }
+
+            catch (Exception exception)
+            {
+                LOGGER.error("Failed to retrieve credentials by id. {}", String.valueOf(exception));
+            }
+
+            return promise.future();
+        }
+
+        private List<JsonObject> extractCredentials(JsonArray credentialsIds)
+        {
+            var credentialsList = new ArrayList<JsonObject>();
+
+            var futures = new ArrayList<Future<JsonObject>>();
+
+            // Create a promise to return the list of credentials
+            var promise = Promise.<List<JsonObject>>promise();
+
+            try
+            {
+                // Using executeBlocking to handle blocking database operations
+                vertx.executeBlocking(() ->
+                {
+                    for (var i = 0; i < credentialsIds.size(); i++)
+                    {
+                        var credentialId = credentialsIds.getString(i);
+
+                        var credentialFuture = retrieveCredentialById(credentialId);
+
+                        futures.add(credentialFuture);
+
+                        credentialFuture.onComplete(result ->
+                        {
+                            if (result.succeeded())
+                            {
+                                credentialsList.add(result.result());
+                            }
+                            else
+                            {
+                                LOGGER.error("Failed to retrieve credential for ID {}: {}", credentialId, result.cause().getMessage());
+                            }
+                        });
+                    }
+
+                    Future.all(futures).onComplete(allResult ->
+                    {
+                        if (allResult.succeeded()) {
+                            LOGGER.info("Successfully extracted credentials");
+                            promise.complete(credentialsList); // Complete with the list
+                        } else {
+                            LOGGER.error("Failed to extract all credentials: {}", allResult.cause().getMessage());
+                            promise.fail(allResult.cause()); // Fail the promise if something goes wrong
+                        }
+                    });
+
+                    return promise.future();
+
+                }, false, asyncHandler ->
+                {
+                    if (asyncHandler.succeeded())
+                    {
+                        LOGGER.info(asyncHandler.result().toString());
+
+//                        LOGGER.info("Successfully extracted credentials");
+
+//                        futures.complete(credentialsList);
 
                     }
 
                     else
                     {
-                        LOGGER.info("Device rediscovered. Duplicate entry found for IP: {}, Port: {}", ip, port);
+                        LOGGER.error("Failed to extract credentials: {}", asyncHandler.cause().getMessage());
+
+//                        resultFuture.fail("Failed to extract credentials");  // Fail the future if something goes wrong
                     }
                 });
+            }
 
-                return null;
-            },false, result ->
+            catch (Exception exception)
             {
-                if (result.failed())
-                {
-                    LOGGER.error("Failed to store discovery data. {}", result.cause().getMessage());
-                }
-            });
+                LOGGER.error("Failed to extract credentials. {}", exception.getMessage());
+            }
+
+            return credentialsList;
         }
 
-        catch (Exception exception)
+        private Future<JsonObject> spawnGoProcess(JsonArray batch)
         {
-            LOGGER.error("Failed to store Discovery Data");
+            return vertx.executeBlocking(() ->
+            {
+                Process process = null;
+
+                BufferedReader reader = null;
+
+                var successfulCredential = "";
+
+                try
+                {
+                    var goExecutable = vertx.getOrCreateContext().config().getString(Constants.GO_EXECUTABLE_PATH);
+
+                    if (goExecutable == null || goExecutable.isEmpty())
+                    {
+                        throw new Exception("goExecutablePath is not set in the configuration.");
+                    }
+
+                    System.out.println("inside spawn go");
+                    LOGGER.info("Attempting to spawn Go process with batch: {}", batch.encodePrettily());
+
+                    var processBuilder = new ProcessBuilder(goExecutable, Constants.DISCOVERY_EVENT, batch.encode()).directory(new File(config().getString(Constants.GO_EXECUTABLE_DIRECTORY)));
+
+                    process = processBuilder.start();
+
+                    reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+                    var output = new StringBuilder();
+
+
+                    var line = "";
+
+                    while ((line = reader.readLine()) != null)
+                    {
+                        output.append(line).append("\n");
+
+                        LOGGER.info("Raw Go output: {}", line);
+
+                        if (line.contains("Successful login for IP"))
+                        {
+                            var startIndex = line.indexOf("{");
+
+                            if (startIndex != -1)
+                            {
+                                successfulCredential = line.substring(startIndex).trim();
+                            }
+                        }
+                    }
+
+                    LOGGER.info("Output------: {}", output);
+
+                    var exitCode = process.waitFor();
+
+                    var result = new JsonObject(successfulCredential);
+
+                    if (exitCode == 0)
+                    {
+                        LOGGER.info("Success credentials are: {}", result);
+
+                    }
+
+                    else
+                    {
+                        var errorMessage = "Go process failed with exit code: " + exitCode;
+
+                        LOGGER.error(errorMessage);
+
+                    }
+
+                    return result;
+
+                }
+
+                catch ( Exception exception)
+                {
+                    LOGGER.error("Failed to spawn go process : {}", exception.getMessage());
+
+                    return null;
+                }
+
+                finally
+                {
+                    if (reader != null)
+                    {
+                        try
+                        {
+                            reader.close();
+                        }
+
+                        catch (Exception exception)
+                        {
+                            LOGGER.error("Failed to close reader: {}", exception.getMessage());
+                        }
+                    }
+
+                    if (process != null)
+                    {
+                        process.destroy();
+                    }
+                }
+            },false);
+        }
+
+        private void storeData(JsonArray successfulDevices)
+        {
+            LOGGER.info("Storing successful devices: {}", successfulDevices.encodePrettily());
+
+            try
+            {
+                Main.vertx().executeBlocking(() ->
+                {
+                    for (var deviceObj : successfulDevices)
+                    {
+
+                        var device = (JsonObject) deviceObj;
+
+                        var ip = device.getString(Constants.IP);
+
+                        // Query to check for duplicates
+                        var query = new JsonObject().put(Constants.IP, ip);
+
+                        // Check for existing entry
+                        Operations.findOne(Constants.OBJECTS_COLLECTION, query).onComplete(result ->
+                        {
+                            if (result.result() == null)
+                            {
+                                // No duplicate found, insert the new data
+                                var discoveryData = new JsonObject().put(Constants.IP, ip).put(CREDENTIALS, device.getJsonArray(CREDENTIALS)).put(Constants.PORT, device.getInteger(Constants.PORT)).put(Constants.OBJECT_ID, ip);
+
+                                Operations.insert(Constants.OBJECTS_COLLECTION, discoveryData).onComplete(asyncResult ->
+                                {
+                                    if (asyncResult.succeeded())
+                                    {
+                                        LOGGER.info("Successfully stored discovery data: {}", discoveryData.encodePrettily());
+                                    }
+
+                                    else
+                                    {
+                                        LOGGER.error("Failed to store discovery data.");
+                                    }
+                                });
+
+                            }
+
+                            else
+                            {
+                                LOGGER.info("Device rediscovered. Duplicate entry found for IP: {}, Port: {}", ip, device.getInteger(Constants.PORT));
+                            }
+                        });
+                    }
+                    return null;
+                    }, false, result ->
+                    {
+                        if (result.failed())
+                        {
+                            LOGGER.error("Failed to store discovery data. {}", result.cause().getMessage());
+                        }
+                });
+
+            }
+            catch (Exception exception)
+            {
+                LOGGER.error("Failed to store Discovery Data");
+            }
+        }
+
+        // New helper function to filter successful devices
+        private JsonArray getSuccessfulDevices(JsonArray batch)
+        {
+            System.out.println("get success devices bathc "+ batch.encodePrettily());
+            JsonArray successfulDevices = new JsonArray();
+            for (var deviceObj : batch) {
+                JsonObject device = (JsonObject) deviceObj;
+                // Assuming each device object contains a status or flag indicating if it succeeded
+                if (device.getBoolean("success", false)) {
+                    successfulDevices.add(device);
+                }
+            }
+            return successfulDevices;
         }
     }
-}

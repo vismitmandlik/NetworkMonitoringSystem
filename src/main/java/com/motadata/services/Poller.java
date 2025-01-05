@@ -138,7 +138,7 @@ public class Poller extends AbstractVerticle
         {
             if (asyncHandler.succeeded())
             {
-                LOGGER.info("Poll completed successfully");
+                LOGGER.debug("Poll completed successfully");
 
                 message.reply(asyncHandler.result());
             }

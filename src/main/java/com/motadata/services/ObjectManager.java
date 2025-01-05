@@ -86,7 +86,7 @@ public class ObjectManager extends AbstractVerticle
                         });
                     }
 
-                    send(event, pollInterval);
+                    schedule(event, pollInterval);
 
                     message.reply(Utils.successResponse());
                 }
@@ -105,9 +105,9 @@ public class ObjectManager extends AbstractVerticle
     }
 
     /* It sends devices in batches to poller verticle */
-    private void send(String event, int pollInterval)
+    private void schedule(String event, int pollInterval)
     {
-        LOGGER.info("Polling started");
+        LOGGER.info("Polling ...");
 
         try
         {
@@ -182,7 +182,7 @@ public class ObjectManager extends AbstractVerticle
                 {
                     if (result.succeeded())
                     {
-                        LOGGER.info("Polling initiated successfully for the batch.");
+                        LOGGER.info("Batch polled.");
                     }
                     else
                     {
@@ -241,7 +241,7 @@ public class ObjectManager extends AbstractVerticle
                     {
                         if(asyncResult.succeeded())
                         {
-                            LOGGER.info("Poller result stored in database: {}", asyncResult.result());
+                            LOGGER.info("Poller result stored in database with document id : {}", asyncResult.result());
                         }
 
                         else
