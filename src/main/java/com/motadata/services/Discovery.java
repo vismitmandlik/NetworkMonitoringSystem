@@ -150,7 +150,7 @@
                             futures.add(future);
                         }
 
-                        LOGGER.info(asyncResult.result().toString());
+                        LOGGER.debug(asyncResult.result().toString());
 
                         var results = asyncResult.result().list(); // Get the list of results
 
@@ -247,11 +247,16 @@
 
                     Future.all(futures).onComplete(allResult ->
                     {
-                        if (allResult.succeeded()) {
+                        if (allResult.succeeded())
+                        {
                             LOGGER.info("Successfully extracted credentials");
+
                             promise.complete(credentialsList); // Complete with the list
-                        } else {
+                        }
+                        else
+                        {
                             LOGGER.error("Failed to extract all credentials: {}", allResult.cause().getMessage());
+
                             promise.fail(allResult.cause()); // Fail the promise if something goes wrong
                         }
                     });
