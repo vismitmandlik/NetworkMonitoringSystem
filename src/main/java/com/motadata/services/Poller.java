@@ -21,8 +21,6 @@ public class Poller extends AbstractVerticle
     public void start()
     {
         vertx.eventBus().localConsumer(Constants.POLLER_VERTICLE, this::poll);
-
-        vertx.eventBus().localConsumer(Constants.DISCOVERY_EVENT, this::poll);
     }
 
     public void poll(Message<JsonObject> message)
