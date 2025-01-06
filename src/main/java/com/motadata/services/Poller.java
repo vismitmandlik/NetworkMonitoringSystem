@@ -72,7 +72,7 @@ public class Poller extends AbstractVerticle
                 }
 
                 // Start the external process
-                process = new ProcessBuilder(goExecutable, event, devicesJsonString).directory(new File("/home/vismit/vismit/learning/new/Golang/GoSpawn/cmd")).start();
+                process = new ProcessBuilder(goExecutable, event, devicesJsonString).directory(new File(config().getString(Constants.GO_EXECUTABLE_DIRECTORY))).start();
 
                 var outputLines = new JsonArray();
 
