@@ -263,18 +263,11 @@
                     if (asyncHandler.succeeded())
                     {
                         LOGGER.info(asyncHandler.result().toString());
-
-//                        LOGGER.info("Successfully extracted credentials");
-
-//                        futures.complete(credentialsList);
-
                     }
 
                     else
                     {
                         LOGGER.error("Failed to extract credentials: {}", asyncHandler.cause().getMessage());
-
-//                        resultFuture.fail("Failed to extract credentials");  // Fail the future if something goes wrong
                     }
                 });
             }
