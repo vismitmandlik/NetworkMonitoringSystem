@@ -7,7 +7,7 @@ public class CredentialProfile
     // Method to register routes
     public static void init(Router router)
     {
-        router.post("/").handler(com.motadata.services.CredentialProfile::save);
+        router.post("/  ").handler(com.motadata.services.CredentialProfile::save);
 
         router.get("/").handler(com.motadata.services.CredentialProfile::getAll);
 

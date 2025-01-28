@@ -8,7 +8,7 @@ A robust and scalable **Network Monitoring System** designed to monitor network 
 - **Device Performance Metrics**: Monitor key metrics like CPU usage, memory, and bandwidth utilization.
 - **Alerts and Notifications**: Receive notifications and alerts for network issues, device failures, or breaches of configured thresholds.
 - **Scalability**: Built to scale with the size of your network, suitable for both small office setups and large enterprise networks.
-- **RESTful API**: Interact programmatically with the system to fetch data, configure devices, and manage alerts.
+- **RESxTful API**: Interact programmatically with the system to fetch data, configure devices, and manage alerts.
 - **Historical Data**: View past performance data and logs to analyze trends and issues.
 
 ## Technologies Used
