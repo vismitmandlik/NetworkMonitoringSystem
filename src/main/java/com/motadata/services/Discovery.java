@@ -160,7 +160,7 @@
 
                             var result = results.get(i);
 
-                            LOGGER.info("Discovery result for IP {}: {}", ip, result);
+                            LOGGER.debug("Discovery result for IP {}: {}", ip, result);
                         }
                     }
 
@@ -320,7 +320,7 @@
                     {
                         output.append(line).append("\n");
 
-                        LOGGER.info("Raw Go output: {}", line);
+                        LOGGER.debug("Raw Go output: {}", line);
 
                         if (line.contains("IP success, Credentials"))
                         {
@@ -447,7 +447,7 @@
             }
         }
 
-        // New helper function to filter successful devices
+        // helper function to filter successful devices
         private JsonArray getSuccessfulDevices(JsonArray batch)
         {
             JsonArray successfulDevices = new JsonArray();
@@ -456,7 +456,7 @@
             {
                 JsonObject device = (JsonObject) deviceObj;
 
-                if (device.containsKey("credentials"))
+                if (device.containsKey(CREDENTIALS))
                 {
                     successfulDevices.add(device);
                 }

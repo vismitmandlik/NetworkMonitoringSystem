@@ -21,13 +21,13 @@ public class Main
 
     private static final int EVENT_BUS_IDLE_TIMEOUT = 120000;
 
-    private static final Vertx vertx = Vertx.vertx(new VertxOptions().setWorkerPoolSize(VERTX_WORKER_POOL_SIZE)
+    private static final Vertx VERTX = Vertx.vertx(new VertxOptions().setWorkerPoolSize(VERTX_WORKER_POOL_SIZE)
             .setEventLoopPoolSize(Runtime.getRuntime().availableProcessors())
             .setEventBusOptions(new EventBusOptions().setConnectTimeout(EVENT_BUS_CONNECTION_TIMEOUT).setIdleTimeout(EVENT_BUS_IDLE_TIMEOUT)));
 
     private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
-    private static final Object CONFIG_FILE_PATH = "src/main/resources/config.json";
+    private static final String CONFIG_FILE_PATH = "src/main/resources/config.json";
 
     private static final int DISCOVERY_VERTICLE_INSTANCES = 1;
 
@@ -39,7 +39,7 @@ public class Main
 
     public static Vertx vertx()
     {
-        return vertx;
+        return VERTX;
     }
 
     public static void main(String[] args)
@@ -47,7 +47,7 @@ public class Main
         try
         {
             /* Set config.json path and load configuration from it */
-            ConfigRetriever.create(vertx, new io.vertx.config.ConfigRetrieverOptions()
+            ConfigRetriever.create(VERTX, new io.vertx.config.ConfigRetrieverOptions()
                     .addStore(new ConfigStoreOptions()
                             .setType(Constants.FILE)
                             .setFormat(Constants.JSON)
@@ -102,7 +102,7 @@ public class Main
                     {
                         LOGGER.error("Failed to deploy Verticle: ", response.cause());
 
-                        vertx.close();
+                        VERTX.close();
                     }
                 });
             });
@@ -120,7 +120,7 @@ public class Main
 
         try
         {
-            vertx.deployVerticle(verticleName, options, result ->
+            VERTX.deployVerticle(verticleName, options, result ->
             {
                 if (result.succeeded())
                 {
